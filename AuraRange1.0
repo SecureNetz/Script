@@ -1,0 +1,204 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+ 
+-- // Configuration \\ --
+local range = 50
+local max_range = 100
+local min_range = 10
+local minimized = false
+local mainFont = Enum.Font.SourceSansBold
+ 
+-- // GUI Creation \\ --
+local sg = Instance.new("ScreenGui")
+sg.Name = "AuraControlUI"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.Parent = player:WaitForChild("PlayerGui")
+ 
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 140) -- Slightly larger for "breathing room"
+frame.Position = UDim2.new(0.5, -120, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.ClipsDescendants = true
+frame.Parent = sg
+ 
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+ 
+-- Satisfying Gradient Stroke
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Color = Color3.fromRGB(0, 255, 150)
+stroke.Parent = frame
+ 
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 45)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "Aura Range Control"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.Font = mainFont
+title.TextSize = 20
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.Parent = frame
+ 
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 1, -45)
+contentFrame.Position = UDim2.new(0, 0, 0, 45)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = frame
+ 
+local display = Instance.new("TextLabel")
+display.Size = UDim2.new(1, 0, 0, 40)
+display.Position = UDim2.new(0, 0, 0.1, 0)
+display.Text = "Range: " .. range
+display.TextColor3 = Color3.fromRGB(0, 255, 150)
+display.BackgroundTransparency = 1
+display.Font = mainFont
+display.TextSize = 28 -- Larger font
+display.Parent = contentFrame
+ 
+-- Minimize Button (R)
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 30, 0, 30)
+minBtn.Position = UDim2.new(1, -38, 0, 8)
+minBtn.Text = "-"
+minBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+minBtn.TextColor3 = Color3.new(1, 1, 1)
+minBtn.Font = mainFont
+minBtn.TextSize = 20
+minBtn.Parent = frame
+ 
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 6)
+minCorner.Parent = minBtn
+ 
+local function createBtn(text, pos, color)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0, 45, 0, 35) -- More clickable size
+    b.Position = pos
+    b.Text = text
+    b.BackgroundColor3 = color
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = mainFont
+    b.TextSize = 22
+    b.Parent = contentFrame
+ 
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = b
+ 
+    -- Hover Animations
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = color:Lerp(Color3.new(1,1,1), 0.2)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+    end)
+ 
+    return b
+end
+ 
+local minusBtn = createBtn("-", UDim2.new(0.2, -22, 0.6, 0), Color3.fromRGB(200, 50, 50))
+local plusBtn = createBtn("+", UDim2.new(0.8, -22, 0.6, 0), Color3.fromRGB(50, 200, 50))
+ 
+-- // Notification System \\ --
+local function notify(msg)
+    local notifFrame = Instance.new("Frame")
+    notifFrame.Size = UDim2.new(0, 200, 0, 45)
+    notifFrame.Position = UDim2.new(1, 20, 0.8, 0)
+    notifFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    notifFrame.BorderSizePixel = 0
+    notifFrame.Parent = sg
+ 
+    local nStroke = Instance.new("UIStroke")
+    nStroke.Color = Color3.fromRGB(0, 255, 150)
+    nStroke.Thickness = 1
+    nStroke.Parent = notifFrame
+ 
+    local nCorner = Instance.new("UICorner")
+    nCorner.CornerRadius = UDim.new(0, 8)
+    nCorner.Parent = notifFrame
+ 
+    local nText = Instance.new("TextLabel")
+    nText.Size = UDim2.new(1, 0, 1, 0)
+    nText.BackgroundTransparency = 1
+    nText.Text = msg
+    nText.TextColor3 = Color3.new(1, 1, 1)
+    nText.Font = mainFont
+    nText.TextSize = 14
+    nText.Parent = notifFrame
+ 
+    notifFrame:TweenPosition(UDim2.new(1, -220, 0.8, 0), "Out", "Back", 0.5, true)
+    task.wait(2)
+    notifFrame:TweenPosition(UDim2.new(1, 20, 0.8, 0), "In", "Quad", 0.5, true)
+    game:GetService("Debris"):AddItem(notifFrame, 0.6)
+end
+ 
+-- // Logic \\ --
+local function setContentTransparency(transparency)
+    local tweenInfo = TweenInfo.new(0.2)
+    TweenService:Create(display, tweenInfo, {TextTransparency = transparency}):Play()
+    TweenService:Create(minusBtn, tweenInfo, {TextTransparency = transparency, BackgroundTransparency = transparency}):Play()
+    TweenService:Create(plusBtn, tweenInfo, {TextTransparency = transparency, BackgroundTransparency = transparency}):Play()
+end
+ 
+local function toggleMinimize()
+    minimized = not minimized
+    if minimized then
+        setContentTransparency(1)
+        frame:TweenSize(UDim2.new(0, 240, 0, 45), "Out", "Quart", 0.4, true)
+        minBtn.Text = "+"
+        notify("Aura: Minimized")
+    else
+        frame:TweenSize(UDim2.new(0, 240, 0, 140), "Out", "Quart", 0.4, true)
+        task.wait(0.1)
+        setContentTransparency(0)
+        minBtn.Text = "-"
+        notify("Aura: Expanded")
+    end
+end
+ 
+minBtn.MouseButton1Click:Connect(toggleMinimize)
+UserInputService.InputBegan:Connect(function(i, p) if not p and i.KeyCode == Enum.KeyCode.R then toggleMinimize() end end)
+ 
+minusBtn.MouseButton1Click:Connect(function()
+    range = math.max(min_range, range - 5)
+    display.Text = "Range: " .. range
+    notify("Range: " .. range)
+end)
+ 
+plusBtn.MouseButton1Click:Connect(function()
+    range = math.min(max_range, range + 5)
+    display.Text = "Range: " .. range
+    notify("Range: " .. range)
+end)
+ 
+-- // Kill Aura Loop \\ --
+RunService.RenderStepped:Connect(function()
+    local p = Players:GetPlayers()
+    for i = 1, #p do 
+        local v = p[i]
+        if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local char = v.Character
+            if (char.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude <= range then
+                local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+                if tool and tool:FindFirstChild("Handle") then
+                    tool:Activate()
+                    if firetouchinterest then
+                        firetouchinterest(tool.Handle, char.HumanoidRootPart, 0)
+                        firetouchinterest(tool.Handle, char.HumanoidRootPart, 1)
+                    end
+                end
+            end
+        end
+    end
+end)
