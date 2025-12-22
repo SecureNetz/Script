@@ -1,0 +1,86 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- // Configuration \\ --
+_G.AutoCollect = false
+
+-- // Advanced Plot Scanner \\ --
+local function GetMyPlot()
+    for _, plot in pairs(workspace:GetDescendants()) do
+        local owner = plot:FindFirstChild("Owner")
+        if owner and (owner.Value == LocalPlayer.Name or owner.Value == LocalPlayer) then
+            return plot
+        end
+    end
+    return nil
+end
+
+-- // High-Frequency Collection Thread \\ --
+task.spawn(function()
+    while task.wait(0.3) do
+        if _G.AutoCollect then
+            local plot = GetMyPlot()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            if plot and hrp then
+                -- Deep scan for Horror Tycoon's specific cash triggers
+                for _, v in pairs(plot:GetDescendants()) do
+                    if v:IsA("TouchTransmitter") then
+                        local p = v.Parent
+                        if p.Name:lower():find("collect") or p.Name:lower():find("essence") or p.Name == "Giver" then
+                            firetouchinterest(hrp, p, 0)
+                            firetouchinterest(hrp, p, 1)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- // Modernized UI with Minimize Option \\ --
+local sg = Instance.new("ScreenGui", LocalPlayer.PlayerGui); sg.Name = "VaultV20"
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 220, 0, 130); main.Position = UDim2.new(0.5, -110, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Active = true; main.Draggable = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+local stroke = Instance.new("UIStroke", main); stroke.Color = Color3.fromRGB(255, 120, 0); stroke.Thickness = 2
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(0.7, 0, 0, 40); title.Position = UDim2.new(0.05, 0, 0, 0)
+title.Text = "VAULT UTILITY B"; title.TextColor3 = Color3.new(1,1,1); title.Font = Enum.Font.GothamBold; title.TextXAlignment = Enum.TextXAlignment.Left; title.BackgroundTransparency = 1
+
+-- Minimize Button
+local miniBtn = Instance.new("TextButton", main)
+miniBtn.Size = UDim2.new(0, 30, 0, 30); miniBtn.Position = UDim2.new(0.85, -5, 0.05, 0)
+miniBtn.Text = "-"; miniBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); miniBtn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", miniBtn)
+
+local contentFrame = Instance.new("Frame", main)
+contentFrame.Size = UDim2.new(1, 0, 0.7, 0); contentFrame.Position = UDim2.new(0, 0, 0.3, 0); contentFrame.BackgroundTransparency = 1
+
+local collectBtn = Instance.new("TextButton", contentFrame)
+collectBtn.Size = UDim2.new(0.9, 0, 0, 50); collectBtn.Position = UDim2.new(0.05, 0, 0.1, 0)
+collectBtn.Text = "AUTO-COLLECT: OFF"; collectBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25); collectBtn.TextColor3 = Color3.new(1,1,1); collectBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", collectBtn)
+
+-- // UI Logic \\ --
+local minimized = false
+miniBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        contentFrame.Visible = false
+        main:TweenSize(UDim2.new(0, 220, 0, 40), "Out", "Quad", 0.3, true)
+        miniBtn.Text = "+"
+    else
+        main:TweenSize(UDim2.new(0, 220, 0, 130), "Out", "Quad", 0.3, true)
+        task.delay(0.3, function() contentFrame.Visible = true end)
+        miniBtn.Text = "-"
+    end
+end)
+
+collectBtn.MouseButton1Click:Connect(function()
+    _G.AutoCollect = not _G.AutoCollect
+    collectBtn.Text = _G.AutoCollect and "COLLECTING..." or "AUTO-COLLECT: OFF"
+    collectBtn.TextColor3 = _G.AutoCollect and Color3.fromRGB(0, 255, 150) or Color3.new(1,1,1)
+    collectBtn.BackgroundColor3 = _G.AutoCollect and Color3.fromRGB(20, 40, 30) or Color3.fromRGB(25, 25, 25)
+end)
