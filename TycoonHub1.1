@@ -1,3 +1,6 @@
+-- // Tycoon Hub 1.1 (Official Version)
+-- // Integrated with Horror Tycoon Gear Collector
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -11,6 +14,38 @@ getgenv().AuraRange = 50
 local buyCooldown = false 
 local lastIndex = 0
 local minimized = false
+
+-- // Horror Tycoon Logic
+local targetGears = {"GEAR1", "GEAR2", "GEAR3", "GEAR4", "GEAR5", "GEAR6", "GEAR7", "GEAR8", "GEAR9", "GEAR10"}
+
+local function collectSpecificGears()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local originalLocation = root.CFrame
+    local foundAny = false
+
+    for _, obj in ipairs(game:GetService("Workspace"):GetDescendants()) do
+        for _, gearName in ipairs(targetGears) do
+            if obj.Name == gearName then
+                local touchPart = obj:FindFirstChild("Handle") or (obj:IsA("BasePart") and obj)
+                if touchPart then
+                    foundAny = true
+                    root.CFrame = touchPart.CFrame
+                    task.wait(0.15) 
+                end
+            end
+        end
+    end
+    root.CFrame = originalLocation
+    
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Tycoon Hub 1.1",
+        Text = foundAny and "Gears Collected!" or "No Gears Found.",
+        Duration = 3
+    })
+end
 
 -- // Index Cycling Teleport
 local function GetAllBases()
@@ -39,15 +74,15 @@ local function TeleportToOpenBase()
     return false
 end
 
--- // GUI Setup (Tycoon Hub 1.0)
+-- // GUI Setup (Tycoon Hub 1.1)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TycoonHub1.0"
+ScreenGui.Name = "TycoonHub1.1"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 380) 
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -190)
+MainFrame.Size = UDim2.new(0, 250, 0, 430) 
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -215)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -57,7 +92,7 @@ Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Text = "TYCOON HUB 1.0"
+Title.Text = "TYCOON HUB 1.1"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 Title.Font = Enum.Font.GothamBold
@@ -103,34 +138,41 @@ local function CreateButton(text, pos, callback)
 end
 
 -- // Features
-CreateButton("Auto-Collect: OFF", UDim2.new(0.075, 0, 0.14, 0), function(btn)
+CreateButton("Auto-Collect: OFF", UDim2.new(0.075, 0, 0.12, 0), function(btn)
     getgenv().AutoCollect = not getgenv().AutoCollect
     btn.Text = getgenv().AutoCollect and "Auto-Collect: ON" or "Auto-Collect: OFF"
     btn.BackgroundColor3 = getgenv().AutoCollect and Color3.fromRGB(60, 160, 60) or Color3.fromRGB(50, 50, 50)
 end)
 
-CreateButton("Auto-Buy: OFF", UDim2.new(0.075, 0, 0.26, 0), function(btn)
+CreateButton("Auto-Buy: OFF", UDim2.new(0.075, 0, 0.22, 0), function(btn)
     getgenv().AutoBuy = not getgenv().AutoBuy
     btn.Text = getgenv().AutoBuy and "Auto-Buy: ON" or "Auto-Buy: OFF"
     btn.BackgroundColor3 = getgenv().AutoBuy and Color3.fromRGB(60, 160, 60) or Color3.fromRGB(50, 50, 50)
 end)
 
-CreateButton("Noclip: OFF", UDim2.new(0.075, 0, 0.38, 0), function(btn)
+CreateButton("Noclip: OFF", UDim2.new(0.075, 0, 0.32, 0), function(btn)
     getgenv().Noclip = not getgenv().Noclip
     btn.Text = getgenv().Noclip and "Noclip: ON" or "Noclip: OFF"
     btn.BackgroundColor3 = getgenv().Noclip and Color3.fromRGB(160, 60, 60) or Color3.fromRGB(50, 50, 50)
 end)
 
-CreateButton("Cycle Through Bases", UDim2.new(0.075, 0, 0.50, 0), function(btn)
+CreateButton("Cycle Through Bases", UDim2.new(0.075, 0, 0.42, 0), function(btn)
     local success = TeleportToOpenBase()
     btn.Text = success and "Teleported!" or "No Bases Found"
     task.wait(0.5)
     btn.Text = "Cycle Through Bases"
 end)
 
+CreateButton("Collect Horror Gears", UDim2.new(0.075, 0, 0.52, 0), function(btn)
+    btn.Text = "Scanning..."
+    collectSpecificGears()
+    task.wait(0.5)
+    btn.Text = "Collect Horror Gears"
+end)
+
 local RangeDisplay = Instance.new("TextLabel")
 RangeDisplay.Size = UDim2.new(1, 0, 0, 30)
-RangeDisplay.Position = UDim2.new(0, 0, 0.62, 0)
+RangeDisplay.Position = UDim2.new(0, 0, 0.64, 0)
 RangeDisplay.Text = "Aura Range: 50"
 RangeDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
 RangeDisplay.BackgroundTransparency = 1
@@ -149,7 +191,7 @@ local plusBtn = CreateButton("+ Range", UDim2.new(0.525, 0, 0.74, 0), function()
 end)
 plusBtn.Size = UDim2.new(0.4, 0, 0, 40)
 
--- // Main Loop (Aura/Buy/Collect)
+-- // Main Loop
 RunService.Stepped:Connect(function()
     local char = LocalPlayer.Character
     if char and getgenv().Noclip then
@@ -225,25 +267,20 @@ end)
 -- // FADE MINIMIZE LOGIC
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
-    
     local targetTransparency = minimized and 1 or 0
     local bgTargetTransparency = minimized and 1 or 0
     local tweenTime = 0.3
     
-    -- Fade out Title/Status/Range text
     TweenService:Create(Status, TweenInfo.new(tweenTime), {TextTransparency = targetTransparency}):Play()
     TweenService:Create(RangeDisplay, TweenInfo.new(tweenTime), {TextTransparency = targetTransparency}):Play()
     
-    -- Fade out all buttons
     for _, b in pairs(buttons) do
         TweenService:Create(b, TweenInfo.new(tweenTime), {TextTransparency = targetTransparency, BackgroundTransparency = bgTargetTransparency}):Play()
     end
     
-    -- Resize frame after or during fade
-    MainFrame:TweenSize(minimized and UDim2.new(0, 250, 0, 45) or UDim2.new(0, 250, 0, 380), "Out", "Quad", tweenTime, true)
+    MainFrame:TweenSize(minimized and UDim2.new(0, 250, 0, 45) or UDim2.new(0, 250, 0, 430), "Out", "Quad", tweenTime, true)
     MinBtn.Text = minimized and "+" or "-"
     
-    -- Delay visibility toggle to allow fade to finish
     if not minimized then
         Status.Visible = true; RangeDisplay.Visible = true
         for _, b in pairs(buttons) do b.Visible = true end
