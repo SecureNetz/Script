@@ -188,7 +188,7 @@ end)
 
 CreateButton("Cycle Through Bases", UDim2.new(0.075, 0, 0.42, 0), function(btn)
     local success = TeleportToOpenBase()
-    btn.Text = success and "Teleported!" or "No Bases Found"
+    btn.Text = success and "Teleported" or "No Bases Found"
     task.wait(0.5)
     btn.Text = "Cycle Through Bases"
 end)
