@@ -1,0 +1,831 @@
+-- // Tycoon Hub 1.5 *BETA* (Official Version)
+-- // Integrated with Horror Tycoon Gear Collector, Taunt Tool, & Stealth Module
+-- // FIXED: Taunt Animation & Aura Logic | UI: Small Loading-Style Password Box
+
+-- // PASSWORD CONFIGURATION
+local ACCESS_PASSWORD = "Test1.1"
+
+-- // UI CONSTANTS
+local BG_COLOR = Color3.fromRGB(20, 20, 20)
+local SEC_COLOR = Color3.fromRGB(30, 30, 30)
+local ACCENT_COLOR = Color3.fromRGB(45, 45, 45)
+local WARNING_COLOR = Color3.fromRGB(160, 60, 60)
+local SUCCESS_COLOR = Color3.fromRGB(60, 160, 60)
+local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
+local FONT_BOLD = Enum.Font.GothamBold
+local TEXT_SIZE = 12
+
+-- // YOUR CUSTOM AUDIO ASSET
+local HUB_SOUND_ID = "rbxassetid://135244211779631"
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local LocalPlayer = Players.LocalPlayer
+
+-- // Internal Sound System
+local function PlayHubSound(volume)
+    local s = Instance.new("Sound")
+    s.SoundId = HUB_SOUND_ID
+    s.Volume = volume or 0.7
+    s.Looped = false
+    s.Parent = SoundService
+    if not s.IsLoaded then s.Loaded:Wait() end
+    SoundService:PlayLocalSound(s)
+    task.delay(s.TimeLength + 1, function() s:Destroy() end)
+end
+
+-- // Internal Notification System
+local function CustomNotify(title, text, duration)
+    local NotifyGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("TycoonHub1.5BETA")
+    if not NotifyGui then return end
+
+    local nFrame = Instance.new("Frame")
+    nFrame.Size = UDim2.new(0, 200, 0, 60)
+    nFrame.Position = UDim2.new(1, 50, 0.8, 0)
+    nFrame.BackgroundColor3 = SEC_COLOR
+    nFrame.BorderSizePixel = 0
+    nFrame.Parent = NotifyGui
+    Instance.new("UICorner", nFrame)
+
+    local nTitle = Instance.new("TextLabel")
+    nTitle.Size = UDim2.new(1, -10, 0, 25)
+    nTitle.Position = UDim2.new(0, 5, 0, 5)
+    nTitle.Text = title:upper()
+    nTitle.TextColor3 = TEXT_COLOR
+    nTitle.Font = FONT_BOLD
+    nTitle.TextSize = TEXT_SIZE
+    nTitle.BackgroundTransparency = 1
+    nTitle.Parent = nFrame
+
+    local nText = Instance.new("TextLabel")
+    nText.Size = UDim2.new(1, -10, 0, 25)
+    nText.Position = UDim2.new(0, 5, 0, 25)
+    nText.Text = text
+    nText.TextColor3 = Color3.fromRGB(180, 180, 180)
+    nText.Font = FONT_BOLD
+    nText.TextSize = TEXT_SIZE - 2
+    nText.BackgroundTransparency = 1
+    nText.Parent = nFrame
+
+    nFrame:TweenPosition(UDim2.new(1, -210, 0.8, 0), "Out", "Quart", 0.5, true)
+    
+    task.delay(duration or 3, function()
+        nFrame:TweenPosition(UDim2.new(1, 50, 0.8, 0), "In", "Quart", 0.5, true, function()
+            nFrame:Destroy()
+        end)
+    end)
+end
+
+if _G.TycoonHubLoaded then return end
+
+-- // GLOBAL SETTINGS
+getgenv().JERK_OFF_SPEED = 50
+getgenv().KEEP_ON_DEATH = true
+getgenv().AutoCollect = false
+getgenv().AutoBuy = false
+getgenv().Noclip = false
+getgenv().AuraRange = 50
+getgenv().WalkSpeed = 16
+getgenv().FPSBoost = false
+
+-- // STEALTH SETTINGS
+local invis_on = false
+local buyCooldown = false 
+local lastIndex = 0
+local minimized = false
+local hoppingConfirmed = false
+
+-- // FPS BOOSTER LOGIC
+local function ToggleFPSBoost(state)
+    getgenv().FPSBoost = state
+    if state then
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        settings().Rendering.QualityLevel = 1
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                v.Enabled = false
+            end
+        end
+    else
+        Lighting.GlobalShadows = true
+        CustomNotify("SYSTEM", "Rejoin for full quality reset")
+    end
+end
+
+-- // MOVEMENT UTILITIES
+UserInputService.JumpRequest:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
+local function setTransparency(character, transparency)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("Decal") then
+            part.Transparency = transparency
+        end
+    end
+end
+
+-- // STEALTH LOGIC
+local function ToggleInvisibility()
+    invis_on = not invis_on
+    if invis_on then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        local savedpos = root.CFrame
+        task.wait()
+        char:MoveTo(Vector3.new(-25.95, 84, 3537.55))
+        task.wait(.15)
+        
+        local Seat = Instance.new('Seat', workspace)
+        Seat.Anchored = false
+        Seat.CanCollide = false
+        Seat.Name = 'invischair'
+        Seat.Transparency = 1
+        Seat.Position = Vector3.new(-25.95, 84, 3537.55)
+        
+        local Weld = Instance.new("Weld", Seat)
+        Weld.Part0 = Seat
+        Weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+        task.wait()
+        Seat.CFrame = savedpos
+        setTransparency(char, 0.5)
+        CustomNotify("STEALTH", "Invisibility: ON")
+    else
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj.Name == "invischair" then
+                obj:Destroy()
+            end
+        end
+        
+        if LocalPlayer.Character then 
+            setTransparency(LocalPlayer.Character, 0) 
+        end
+        CustomNotify("STEALTH", "Invisibility: OFF")
+    end
+end
+
+-- // UTILITY FUNCTIONS
+local function ServerHop()
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+    end)
+    if success then
+        local x = {}
+        for _, v in ipairs(result) do
+            if v.maxPlayers > v.playing and v.id ~= game.JobId then table.insert(x, v.id) end
+        end
+        if #x > 0 then TeleportService:TeleportToPlaceInstance(game.PlaceId, x[math.random(1, #x)]) end
+    end
+end
+
+-- // ANIMATION SYSTEM (FIXED TAUNT)
+local MAIN_ANIMATIONS = {
+    JERK_OFF = "rbxassetid://99198989",
+    CLOSER_HANDS = "rbxassetid://168086975",
+}
+local FADE_IN_TIME, FADE_OUT_TIME = 0.8, 0.8
+local JerkingOff = false
+local jerkoffTrack, closerhandsTrack
+
+local function StopAnimations()
+    if jerkoffTrack then jerkoffTrack:Stop(FADE_OUT_TIME) jerkoffTrack = nil end
+    if closerhandsTrack then closerhandsTrack:Stop(FADE_OUT_TIME) closerhandsTrack = nil end
+end
+
+local function StartAnimations()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local Animator = hum and hum:FindFirstChildOfClass("Animator")
+    if Animator and not jerkoffTrack then
+        local a1 = Instance.new("Animation")
+        a1.AnimationId = MAIN_ANIMATIONS.JERK_OFF
+        jerkoffTrack = Animator:LoadAnimation(a1)
+        jerkoffTrack.Priority = Enum.AnimationPriority.Action
+        jerkoffTrack.Looped = true
+        jerkoffTrack:Play(FADE_IN_TIME)
+        
+        local a2 = Instance.new("Animation")
+        a2.AnimationId = MAIN_ANIMATIONS.CLOSER_HANDS
+        closerhandsTrack = Animator:LoadAnimation(a2)
+        closerhandsTrack.Priority = Enum.AnimationPriority.Action
+        closerhandsTrack.Looped = true
+        closerhandsTrack:Play(FADE_IN_TIME)
+    end
+end
+
+local function GiveTool()
+    if LocalPlayer.Backpack:FindFirstChild("Taunt 😳") then return end
+    local Tool = Instance.new("Tool")
+    Tool.Name = "Taunt 😳"
+    Tool.RequiresHandle = false
+    Tool.Equipped:Connect(function() JerkingOff = true StartAnimations() end)
+    Tool.Unequipped:Connect(function() JerkingOff = false StopAnimations() end)
+    Tool.Parent = LocalPlayer:WaitForChild("Backpack")
+end
+
+-- // GEAR LOGIC
+local targetGears = {"GEAR1", "GEAR2", "GEAR3", "GEAR4", "GEAR5", "GEAR6", "GEAR7", "GEAR8", "GEAR9", "GEAR10"}
+local function collectSpecificGears()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local originalLocation = root.CFrame
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        for _, gearName in ipairs(targetGears) do
+            if obj.Name == gearName then
+                local touchPart = obj:FindFirstChild("Handle") or (obj:IsA("BasePart") and obj)
+                if touchPart then
+                    root.CFrame = touchPart.CFrame
+                    task.wait(0.15) 
+                end
+            end
+        end
+    end
+    root.CFrame = originalLocation
+end
+
+local function GetAllBases()
+    local bases = {}
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("TextLabel") and (v.Text:find("Owner") or v.Text:find("Nobody") or v.Text:lower():find("open")) then
+            local basePart = v:FindFirstAncestorWhichIsA("BasePart") or v.Parent:FindFirstChildOfClass("BasePart")
+            if basePart then table.insert(bases, basePart) end
+        end
+    end
+    return bases
+end
+
+local function TeleportToOpenBase()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local allBases = GetAllBases()
+    if #allBases == 0 then return false end
+    lastIndex = (lastIndex % #allBases) + 1
+    root.Velocity = Vector3.new(0,0,0)
+    root.CFrame = allBases[lastIndex].CFrame * CFrame.new(0, 3, 10)
+    return true
+end
+
+-- // GUI SETUP
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TycoonHub1.5BETA"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("CanvasGroup")
+MainFrame.Size = UDim2.new(0, 250, 0, 780) 
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -390)
+MainFrame.BackgroundColor3 = BG_COLOR
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.GroupTransparency = 1 
+MainFrame.Visible = false 
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame)
+
+-- // CUSTOM DRAGGING LOGIC
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- // INTRO SYSTEM (SYNCED FADE)
+local function PlayIntro()
+    _G.TycoonHubLoaded = true
+    local IntroFrame = Instance.new("CanvasGroup")
+    IntroFrame.Size = UDim2.new(0, 300, 0, 150)
+    IntroFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    IntroFrame.BackgroundColor3 = BG_COLOR
+    IntroFrame.BorderSizePixel = 0
+    IntroFrame.GroupTransparency = 1
+    IntroFrame.Parent = ScreenGui
+    Instance.new("UICorner", IntroFrame)
+
+    local IntroTitle = Instance.new("TextLabel")
+    IntroTitle.Size = UDim2.new(1, 0, 0, 50)
+    IntroTitle.Position = UDim2.new(0, 0, 0.2, 0)
+    IntroTitle.Text = "TYCOON HUB"
+    IntroTitle.TextColor3 = TEXT_COLOR
+    IntroTitle.Font = Enum.Font.GothamBlack
+    IntroTitle.TextSize = 24
+    IntroTitle.BackgroundTransparency = 1
+    IntroTitle.Parent = IntroFrame
+
+    local VersionLabel = Instance.new("TextLabel")
+    VersionLabel.Size = UDim2.new(1, 0, 0, 20)
+    VersionLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    VersionLabel.Text = "VERSION 1.5 *BETA*"
+    VersionLabel.TextColor3 = SUCCESS_COLOR
+    VersionLabel.Font = FONT_BOLD
+    VersionLabel.TextSize = 12
+    VersionLabel.BackgroundTransparency = 1
+    VersionLabel.Parent = IntroFrame
+
+    local BarBG = Instance.new("Frame")
+    BarBG.Size = UDim2.new(0.8, 0, 0, 4)
+    BarBG.Position = UDim2.new(0.1, 0, 0.8, 0)
+    BarBG.BackgroundColor3 = SEC_COLOR
+    BarBG.BorderSizePixel = 0
+    BarBG.Parent = IntroFrame
+    Instance.new("UICorner", BarBG)
+
+    local BarFill = Instance.new("Frame")
+    BarFill.Size = UDim2.new(0, 0, 1, 0)
+    BarFill.BackgroundColor3 = SUCCESS_COLOR
+    BarFill.BorderSizePixel = 0
+    BarFill.Parent = BarBG
+    Instance.new("UICorner", BarFill)
+
+    -- Play Sound 1 Time
+    task.spawn(function() PlayHubSound(0.7) end)
+
+    -- Intro Fade In
+    TweenService:Create(IntroFrame, TweenInfo.new(0.6), {GroupTransparency = 0}):Play()
+    task.wait(0.6)
+    
+    -- Load Bar Fill
+    BarFill:TweenSize(UDim2.new(1, 0, 1, 0), "Out", "Linear", 1.2, true)
+    task.wait(1.3)
+    
+    -- Synced Switch
+    MainFrame.Visible = true
+    local syncTime = TweenInfo.new(0.8, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    
+    TweenService:Create(IntroFrame, syncTime, {GroupTransparency = 1}):Play()
+    TweenService:Create(MainFrame, syncTime, {GroupTransparency = 0}):Play()
+    
+    task.delay(0.8, function()
+        IntroFrame:Destroy()
+        CustomNotify("Tycoon Hub 1.5 *BETA*", "Successfully Loaded!")
+    end)
+end
+
+-- // PASSWORD UI SYSTEM (SMALLER INTRO STYLE)
+local AuthFrame = Instance.new("CanvasGroup")
+AuthFrame.Size = UDim2.new(0, 220, 0, 145) -- Smaller Size
+AuthFrame.Position = UDim2.new(0.5, -110, 0.5, -65)
+AuthFrame.BackgroundColor3 = BG_COLOR
+AuthFrame.BorderSizePixel = 0
+AuthFrame.Parent = ScreenGui
+Instance.new("UICorner", AuthFrame)
+
+local AuthTitle = Instance.new("TextLabel")
+AuthTitle.Size = UDim2.new(1, 0, 0, 35)
+AuthTitle.Position = UDim2.new(0, 0, 0.08, 0)
+AuthTitle.Text = "Enter Password"
+AuthTitle.TextColor3 = TEXT_COLOR
+AuthTitle.BackgroundTransparency = 1
+AuthTitle.Font = Enum.Font.GothamBlack
+AuthTitle.TextSize = 20
+AuthTitle.Parent = AuthFrame
+
+local PassBox = Instance.new("TextBox")
+PassBox.Size = UDim2.new(0.85, 0, 0, 30)
+PassBox.Position = UDim2.new(0.075, 0, 0.42, 0)
+PassBox.BackgroundColor3 = SEC_COLOR
+PassBox.TextColor3 = TEXT_COLOR
+PassBox.PlaceholderText = "KEY"
+PassBox.Text = ""
+PassBox.Font = FONT_BOLD
+PassBox.TextSize = 11
+PassBox.Parent = AuthFrame
+Instance.new("UICorner", PassBox)
+
+local SubmitBtn = Instance.new("TextButton")
+SubmitBtn.Size = UDim2.new(0.85, 0, 0, 28)
+SubmitBtn.Position = UDim2.new(0.075, 0, 0.72, 0)
+SubmitBtn.BackgroundColor3 = SUCCESS_COLOR
+SubmitBtn.TextColor3 = TEXT_COLOR
+SubmitBtn.Text = "CONFIRM"
+SubmitBtn.Font = FONT_BOLD
+SubmitBtn.TextSize = 11
+SubmitBtn.Parent = AuthFrame
+Instance.new("UICorner", SubmitBtn)
+
+SubmitBtn.MouseButton1Click:Connect(function()
+    if PassBox.Text == ACCESS_PASSWORD then
+        TweenService:Create(AuthFrame, TweenInfo.new(0.5), {GroupTransparency = 1}):Play()
+        task.delay(0.5, function()
+            AuthFrame:Destroy()
+            PlayIntro()
+        end)
+    else
+        SubmitBtn.BackgroundColor3 = WARNING_COLOR
+        SubmitBtn.Text = "INVALID"
+        task.wait(1)
+        SubmitBtn.BackgroundColor3 = SUCCESS_COLOR
+        SubmitBtn.Text = "CONFIRM"
+    end
+end)
+
+-- // MAIN UI ELEMENTS
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "TYCOON HUB 1.5 *BETA*"
+Title.TextColor3 = TEXT_COLOR
+Title.BackgroundColor3 = SEC_COLOR
+Title.Font = FONT_BOLD
+Title.TextSize = TEXT_SIZE + 1
+Title.Parent = MainFrame
+Instance.new("UICorner", Title)
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, 0, 0, 20)
+Status.Position = UDim2.new(0, 0, 0, 730)
+Status.Text = "Status: Ready"
+Status.TextColor3 = Color3.fromRGB(120, 120, 120)
+Status.BackgroundTransparency = 1
+Status.Font = FONT_BOLD
+Status.TextSize = 10
+Status.Parent = MainFrame
+
+local Credits = Instance.new("TextLabel")
+Credits.Size = UDim2.new(1, 0, 0, 20)
+Credits.Position = UDim2.new(0, 0, 1, -15)
+Credits.Text = "Made By SecureNetz | Stealth by xXHaNdEROXx"
+Credits.TextColor3 = Color3.fromRGB(80, 80, 80)
+Credits.BackgroundTransparency = 1
+Credits.Font = FONT_BOLD
+Credits.TextSize = 8
+Credits.Parent = MainFrame
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 30, 0, 30)
+MinBtn.Position = UDim2.new(1, -35, 0, 7)
+MinBtn.Text = "-"
+MinBtn.BackgroundColor3 = ACCENT_COLOR
+MinBtn.TextColor3 = TEXT_COLOR
+MinBtn.Font = FONT_BOLD
+MinBtn.TextSize = TEXT_SIZE
+MinBtn.Parent = MainFrame
+Instance.new("UICorner", MinBtn)
+
+local elements = {}
+local function CreateSection(text, pos)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 25)
+    label.Position = pos
+    label.Text = "─── " .. text .. " ───"
+    label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label.BackgroundTransparency = 1
+    label.Font = FONT_BOLD
+    label.TextSize = 10
+    label.Parent = MainFrame
+    table.insert(elements, label)
+    return label
+end
+
+local function CreateButton(text, pos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.85, 0, 0, 34)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = ACCENT_COLOR
+    btn.TextColor3 = TEXT_COLOR
+    btn.Font = FONT_BOLD
+    btn.TextSize = TEXT_SIZE
+    btn.Parent = MainFrame
+    Instance.new("UICorner", btn)
+    table.insert(elements, btn)
+    btn.MouseButton1Click:Connect(function() callback(btn) end)
+    return btn
+end
+
+-- // CORE SECTIONS
+CreateSection("AUTOMATION", UDim2.new(0, 0, 0, 55))
+CreateButton("Auto-Collect: OFF", UDim2.new(0.075, 0, 0, 85), function(btn)
+    getgenv().AutoCollect = not getgenv().AutoCollect
+    btn.Text = getgenv().AutoCollect and "Auto-Collect: ON" or "Auto-Collect: OFF"
+    TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = getgenv().AutoCollect and SUCCESS_COLOR or ACCENT_COLOR}):Play()
+end)
+
+CreateButton("Auto-Buy: OFF", UDim2.new(0.075, 0, 0, 125), function(btn)
+    getgenv().AutoBuy = not getgenv().AutoBuy
+    btn.Text = getgenv().AutoBuy and "Auto-Buy: ON" or "Auto-Buy: OFF"
+    TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = getgenv().AutoBuy and SUCCESS_COLOR or ACCENT_COLOR}):Play()
+end)
+
+CreateSection("STEALTH & PERFORMANCE", UDim2.new(0, 0, 0, 175))
+CreateButton("Invisibility: OFF", UDim2.new(0.075, 0, 0, 205), function(btn)
+    ToggleInvisibility()
+    btn.Text = invis_on and "Invisibility: ON" or "Invisibility: OFF"
+    TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = invis_on and SUCCESS_COLOR or ACCENT_COLOR}):Play()
+end)
+
+CreateButton("FPS Booster: OFF", UDim2.new(0.075, 0, 0, 245), function(btn)
+    local state = not getgenv().FPSBoost
+    ToggleFPSBoost(state)
+    btn.Text = state and "FPS Booster: ON" or "FPS Booster: OFF"
+    TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = state and SUCCESS_COLOR or ACCENT_COLOR}):Play()
+end)
+
+CreateSection("UTILITIES", UDim2.new(0, 0, 0, 295))
+CreateButton("Server Hopper", UDim2.new(0.075, 0, 0, 325), function(btn)
+    if not hoppingConfirmed then
+        hoppingConfirmed = true
+        TweenService:Create(btn, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {BackgroundColor3 = WARNING_COLOR}):Play()
+        btn.Text = "Do You Wish To Proceed?"
+        task.delay(3, function()
+            if hoppingConfirmed then
+                hoppingConfirmed = false
+                TweenService:Create(btn, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {BackgroundColor3 = ACCENT_COLOR}):Play()
+                btn.Text = "Server Hopper"
+            end
+        end)
+    else
+        btn.Text = "Hopping..."
+        ServerHop()
+        task.wait(1)
+        hoppingConfirmed = false
+        btn.Text = "Server Hopper"
+        btn.BackgroundColor3 = ACCENT_COLOR
+    end
+end)
+
+CreateButton("Cycle Through Bases", UDim2.new(0.075, 0, 0, 365), function(btn)
+    local success = TeleportToOpenBase()
+    btn.Text = success and "Teleported!" or "No Bases Found"
+    task.wait(0.5)
+    btn.Text = "Cycle Through Bases"
+end)
+
+CreateButton("Collect Horror Gears", UDim2.new(0.075, 0, 0, 405), function(btn)
+    btn.Text = "Scanning..."
+    collectSpecificGears()
+    task.wait(0.5)
+    btn.Text = "Collect Horror Gears"
+end)
+
+CreateSection("MOVEMENT & COMBAT", UDim2.new(0, 0, 0, 455))
+CreateButton("Noclip: OFF", UDim2.new(0.075, 0, 0, 485), function(btn)
+    getgenv().Noclip = not getgenv().Noclip
+    btn.Text = getgenv().Noclip and "Noclip: ON" or "Noclip: OFF"
+    TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = getgenv().Noclip and WARNING_COLOR or ACCENT_COLOR}):Play()
+end)
+
+CreateButton("Shiftlock: OFF", UDim2.new(0.075, 0, 0, 525), function(btn)
+    if CoreGui:FindFirstChild("Shiftlock (CoreGui)") then
+        local GUI = CoreGui["Shiftlock (CoreGui)"]
+        GUI.Enabled = not GUI.Enabled
+        btn.Text = GUI.Enabled and "Shiftlock: ON" or "Shiftlock: OFF"
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = GUI.Enabled and SUCCESS_COLOR or ACCENT_COLOR}):Play()
+    end
+end)
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0, 0, 0, 570)
+SpeedLabel.Text = "WALKSPEED"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Font = FONT_BOLD
+SpeedLabel.TextSize = 10
+SpeedLabel.Parent = MainFrame
+table.insert(elements, SpeedLabel)
+
+local SpeedBox = Instance.new("TextBox")
+SpeedBox.Size = UDim2.new(0.85, 0, 0, 30)
+SpeedBox.Position = UDim2.new(0.075, 0, 0, 595)
+SpeedBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SpeedBox.TextColor3 = TEXT_COLOR
+SpeedBox.Font = FONT_BOLD
+SpeedBox.TextSize = TEXT_SIZE
+SpeedBox.Text = "16"
+SpeedBox.Parent = MainFrame
+Instance.new("UICorner", SpeedBox)
+table.insert(elements, SpeedBox)
+
+SpeedBox.FocusLost:Connect(function()
+    local num = tonumber(SpeedBox.Text)
+    if num then getgenv().WalkSpeed = num end
+end)
+
+local RangeDisplay = Instance.new("TextLabel")
+RangeDisplay.Size = UDim2.new(1, 0, 0, 25)
+RangeDisplay.Position = UDim2.new(0, 0, 0, 635)
+RangeDisplay.Text = "Aura Range: 50"
+RangeDisplay.TextColor3 = Color3.fromRGB(200, 200, 200)
+RangeDisplay.BackgroundTransparency = 1
+RangeDisplay.Font = FONT_BOLD
+RangeDisplay.TextSize = 10
+RangeDisplay.Parent = MainFrame
+table.insert(elements, RangeDisplay)
+
+local minusBtn = CreateButton("-", UDim2.new(0.075, 0, 0, 660), function()
+    getgenv().AuraRange = math.max(10, getgenv().AuraRange - 5)
+    RangeDisplay.Text = "Aura Range: " .. getgenv().AuraRange
+end)
+minusBtn.Size = UDim2.new(0.4, 0, 0, 34)
+
+local plusBtn = CreateButton("+", UDim2.new(0.525, 0, 0, 660), function()
+    getgenv().AuraRange = math.min(100, getgenv().AuraRange + 5)
+    RangeDisplay.Text = "Aura Range: " .. getgenv().AuraRange
+end)
+plusBtn.Size = UDim2.new(0.4, 0, 0, 34)
+
+-- // SHIFTLOCK MODULE
+local SLSG = Instance.new("ScreenGui")
+local SLB = Instance.new("ImageButton")
+local SLC = Instance.new("ImageLabel")
+local States = { Off = "rbxasset://textures/ui/mouseLock_off@2x.png", On = "rbxasset://textures/ui/mouseLock_on@2x.png", Lock = "rbxasset://textures/MouseLockedCursor.png" }
+local Active
+
+SLSG.Name = "Shiftlock (CoreGui)"
+SLSG.Parent = CoreGui
+SLSG.Enabled = false 
+SLB.Parent = SLSG
+SLB.Position = UDim2.new(0.72, 0, 0.78, 0)
+SLB.Size = UDim2.new(0, 40, 0, 40)
+SLB.Image = States.Off
+SLB.BackgroundTransparency = 1
+SLC.Parent = SLSG
+SLC.Image = States.Lock
+SLC.Size = UDim2.new(0, 25, 0, 25)
+SLC.Position = UDim2.new(0.5, 0, 0.5, 0)
+SLC.AnchorPoint = Vector2.new(0.5, 0.5)
+SLC.BackgroundTransparency = 1
+SLC.Visible = false
+
+SLB.MouseButton1Click:Connect(function()
+    if not Active then
+        Active = RunService.RenderStepped:Connect(function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid.AutoRotate = false
+                SLB.Image = States.On
+                SLC.Visible = true
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(LocalPlayer.Character.HumanoidRootPart.Position, Vector3.new(workspace.CurrentCamera.CFrame.LookVector.X * 900000, LocalPlayer.Character.HumanoidRootPart.Position.Y, workspace.CurrentCamera.CFrame.LookVector.Z * 900000))
+                workspace.CurrentCamera.CFrame = workspace.CurrentCamera.CFrame * CFrame.new(1.7, 0, 0)
+            end
+        end)
+    else
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.AutoRotate = true end
+        SLB.Image = States.Off
+        SLC.Visible = false
+        if Active then Active:Disconnect() Active = nil end
+    end
+end)
+
+-- // HEARTBEAT ENGINE
+LocalPlayer.CharacterAdded:Connect(function(char)
+    StopAnimations()
+    invis_on = false
+    getgenv().WalkSpeed = 16
+    if getgenv().KEEP_ON_DEATH then task.wait(0.5) GiveTool() end
+end)
+if getgenv().KEEP_ON_DEATH then GiveTool() end
+
+RunService.Heartbeat:Connect(function()
+    if not _G.TycoonHubLoaded then return end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not root then return end
+    hum.WalkSpeed = getgenv().WalkSpeed
+
+    -- Adjust Taunt Animation Speed
+    if JerkingOff and jerkoffTrack and closerhandsTrack then
+        jerkoffTrack:AdjustSpeed(getgenv().JERK_OFF_SPEED / 10)
+        closerhandsTrack:AdjustSpeed(getgenv().JERK_OFF_SPEED / 10)
+    end
+
+    if getgenv().AutoCollect then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if (v.Name == "Collect" or v.Name == "Collector") and v:IsA("BasePart") then
+                firetouchinterest(root, v, 0)
+                firetouchinterest(root, v, 1)
+            end
+        end
+    end
+
+    if getgenv().AutoBuy and not buyCooldown then
+        buyCooldown = true
+        task.spawn(function()
+            for _, v in pairs(workspace:GetDescendants()) do
+                if (v.Name == "Button" or v:FindFirstChild("Price")) and v:IsA("BasePart") and v.Transparency == 0 then
+                    local isRobux = false
+                    if v:FindFirstChild("Gamepass") or v:FindFirstChild("ProductID") or v:FindFirstChild("DevProduct") then
+                        isRobux = true
+                    else
+                        for _, child in pairs(v:GetDescendants()) do
+                            if child:IsA("TextLabel") and (child.Text:find("R%$") or child.Text:lower():find("robux")) then
+                                isRobux = true break
+                            end
+                        end
+                    end
+                    if not isRobux then
+                        firetouchinterest(root, v, 0)
+                        firetouchinterest(root, v, 1)
+                    end
+                end
+            end
+            for i = 10, 1, -1 do Status.Text = "Status: Waiting ("..i.."s)" task.wait(1) end
+            buyCooldown = false Status.Text = "Status: Ready"
+        end)
+    end
+
+    -- Integrated Aura Logic
+    for _, ply in pairs(Players:GetPlayers()) do
+        if ply ~= LocalPlayer and ply.Character and ply.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyRoot = ply.Character.HumanoidRootPart
+            if (enemyRoot.Position - root.Position).Magnitude <= getgenv().AuraRange then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool then
+                    tool:Activate()
+                    local h = tool:FindFirstChild("Handle") or tool:FindFirstChildOfClass("Part")
+                    if h then 
+                        local oldCFrame = h.CFrame
+                        h.CFrame = enemyRoot.CFrame
+                        firetouchinterest(h, enemyRoot, 0)
+                        firetouchinterest(h, enemyRoot, 1)
+                        h.CFrame = oldCFrame
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char and getgenv().Noclip then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+-- // MINIMIZE LOGIC
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    local targetTrans = minimized and 1 or 0
+    local bgTrans = minimized and 1 or 0
+    local tweenTime = 0.3
+    
+    TweenService:Create(Status, TweenInfo.new(tweenTime), {TextTransparency = targetTrans}):Play()
+    TweenService:Create(Credits, TweenInfo.new(tweenTime), {TextTransparency = targetTrans}):Play()
+    
+    for _, el in pairs(elements) do
+        if el:IsA("TextButton") or el:IsA("TextBox") then
+            if not minimized then el.Visible = true end 
+            TweenService:Create(el, TweenInfo.new(tweenTime), {TextTransparency = targetTrans}):Play()
+            TweenService:Create(el, TweenInfo.new(tweenTime), {BackgroundTransparency = bgTrans}):Play()
+        else
+            TweenService:Create(el, TweenInfo.new(tweenTime), {TextTransparency = targetTrans}):Play()
+        end
+    end
+    
+    MainFrame:TweenSize(minimized and UDim2.new(0, 250, 0, 45) or UDim2.new(0, 250, 0, 780), "Out", "Quad", tweenTime, true)
+    
+    task.delay(minimized and tweenTime or 0, function()
+        for _, el in pairs(elements) do
+            if el:IsA("TextButton") or el:IsA("TextBox") then
+                el.Visible = not minimized
+            end
+        end
+    end)
+    
+    MinBtn.Text = minimized and "+" or "-"
+end)
