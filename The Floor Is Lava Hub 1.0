@@ -1,0 +1,556 @@
+-- Combined Tycoon Hub: Useless Fling + Coin Collector + Lava Fling V4
+-- Single GUI controlling all three features
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local lp = Players.LocalPlayer
+
+-- ==================== GUI SETUP ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TycoonHub_Combined"
+ScreenGui.Parent = lp:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Position = UDim2.new(0.35, 0, 0.25, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 380)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+
+local UICorner_Main = Instance.new("UICorner")
+UICorner_Main.CornerRadius = UDim.new(0, 10)
+UICorner_Main.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(45, 45, 45)
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = MainFrame
+
+local TopBar = Instance.new("Frame")
+TopBar.Parent = MainFrame
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+
+local UICorner_Top = Instance.new("UICorner")
+UICorner_Top.CornerRadius = UDim.new(0, 10)
+UICorner_Top.Parent = TopBar
+
+local LogoBadge = Instance.new("TextButton")
+LogoBadge.Parent = TopBar
+LogoBadge.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+LogoBadge.Position = UDim2.new(0.05, 0, 0.15, 0)
+LogoBadge.Size = UDim2.new(0, 28, 0, 28)
+LogoBadge.Text = ""
+LogoBadge.AutoButtonColor = false
+
+local UICorner_Logo = Instance.new("UICorner")
+UICorner_Logo.CornerRadius = UDim.new(1, 0)
+UICorner_Logo.Parent = LogoBadge
+
+local LogoText = Instance.new("TextLabel")
+LogoText.Parent = LogoBadge
+LogoText.BackgroundTransparency = 1
+LogoText.Size = UDim2.new(1, 0, 1, 0)
+LogoText.Font = Enum.Font.GothamBold
+LogoText.Text = "N"
+LogoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+LogoText.TextSize = 16
+
+local Title = Instance.new("TextLabel")
+Title.Parent = TopBar
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0.25, 0, 0, 0)
+Title.Size = UDim2.new(0.5, 0, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "TYCOON HUB"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = TopBar
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Position = UDim2.new(0.85, 0, 0, 0)
+CloseBtn.Size = UDim2.new(0.15, 0, 1, 0)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextSize = 16
+
+-- Minimize logic
+local minimized = false
+LogoBadge.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        MainFrame:TweenSize(UDim2.new(0, 40, 0, 40), "Out", "Quad", 0.3, true)
+        Title.Visible = false
+        CloseBtn.Visible = false
+    else
+        MainFrame:TweenSize(UDim2.new(0, 220, 0, 380), "Out", "Quad", 0.3, true)
+        task.wait(0.2)
+        Title.Visible = true
+        CloseBtn.Visible = true
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- ==================== USELESS FLING SECTION ====================
+local FlingToggle = Instance.new("TextButton")
+FlingToggle.Parent = MainFrame
+FlingToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+FlingToggle.Position = UDim2.new(0.1, 0, 0.13, 0)
+FlingToggle.Size = UDim2.new(0.8, 0, 0, 35)
+FlingToggle.Font = Enum.Font.GothamSemibold
+FlingToggle.Text = "USELESS FLING: OFF"
+FlingToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+FlingToggle.TextSize = 13
+Instance.new("UICorner", FlingToggle).CornerRadius = UDim.new(0, 6)
+
+local ForceInput = Instance.new("TextBox")
+ForceInput.Parent = MainFrame
+ForceInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ForceInput.Position = UDim2.new(0.1, 0, 0.24, 0)
+ForceInput.Size = UDim2.new(0.8, 0, 0, 30)
+ForceInput.Font = Enum.Font.Gotham
+ForceInput.PlaceholderText = "Force (30)"
+ForceInput.Text = "30"
+ForceInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ForceInput.TextSize = 14
+Instance.new("UICorner", ForceInput).CornerRadius = UDim.new(0, 6)
+
+-- ==================== COIN COLLECTOR SECTION ====================
+local CollectorToggle = Instance.new("TextButton")
+CollectorToggle.Parent = MainFrame
+CollectorToggle.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CollectorToggle.Position = UDim2.new(0.1, 0, 0.37, 0)
+CollectorToggle.Size = UDim2.new(0.8, 0, 0, 35)
+CollectorToggle.Font = Enum.Font.SourceSansBold
+CollectorToggle.Text = "COIN COLLECTOR: OFF"
+CollectorToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+CollectorToggle.TextSize = 13
+Instance.new("UICorner", CollectorToggle).CornerRadius = UDim.new(0, 6)
+
+-- ==================== LAVA FLING SECTION ====================
+local TargetInput = Instance.new("TextBox")
+TargetInput.Parent = MainFrame
+TargetInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TargetInput.Position = UDim2.new(0.1, 0, 0.5, 0)
+TargetInput.Size = UDim2.new(0.8, 0, 0, 28)
+TargetInput.PlaceholderText = "Target Name (optional)"
+TargetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
+
+local LavaSingleToggle = Instance.new("TextButton")
+LavaSingleToggle.Parent = MainFrame
+LavaSingleToggle.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
+LavaSingleToggle.Position = UDim2.new(0.1, 0, 0.62, 0)
+LavaSingleToggle.Size = UDim2.new(0.8, 0, 0, 35)
+LavaSingleToggle.Font = Enum.Font.SourceSansBold
+LavaSingleToggle.Text = "LAVA FLING SINGLE: OFF"
+LavaSingleToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+LavaSingleToggle.TextSize = 12
+Instance.new("UICorner", LavaSingleToggle).CornerRadius = UDim.new(0, 6)
+
+local LavaAllToggle = Instance.new("TextButton")
+LavaAllToggle.Parent = MainFrame
+LavaAllToggle.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+LavaAllToggle.Position = UDim2.new(0.1, 0, 0.75, 0)
+LavaAllToggle.Size = UDim2.new(0.8, 0, 0, 35)
+LavaAllToggle.Font = Enum.Font.SourceSansBold
+LavaAllToggle.Text = "LAVA FLING ALL: OFF"
+LavaAllToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+LavaAllToggle.TextSize = 13
+Instance.new("UICorner", LavaAllToggle).CornerRadius = UDim.new(0, 6)
+
+-- ==================== LOGIC VARIABLES ====================
+local hiddenfling = false
+local pushForce = 30
+local HITBOX_RADIUS = 60
+local bg = nil
+
+local collectorActive = false
+local LastPos = nil
+local DiamondPos = nil
+local LastNotifyTime = 0
+local COIN_SIZE = Vector3.new(4.2290520668029785, 0.5638735890388489, 4.2290520668029785)
+
+local lavaSingleActive = false
+local lavaAllActive = false
+
+-- ==================== NOTIFICATION SYSTEM (for Coin Collector) ====================
+local function notify(msg)
+    if tick() - LastNotifyTime > 5 then 
+        LastNotifyTime = tick()
+        local NotifFrame = Instance.new("Frame")
+        local NotifText = Instance.new("TextLabel")
+        local NotifCorner = Instance.new("UICorner")
+        NotifFrame.Parent = ScreenGui
+        NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        NotifFrame.Position = UDim2.new(1, 10, 0.8, 0)
+        NotifFrame.Size = UDim2.new(0, 200, 0, 50)
+        NotifCorner.CornerRadius = UDim.new(0, 8)
+        NotifCorner.Parent = NotifFrame
+        NotifText.Parent = NotifFrame
+        NotifText.BackgroundTransparency = 1
+        NotifText.Size = UDim2.new(1, 0, 1, 0)
+        NotifText.Font = Enum.Font.SourceSansBold
+        NotifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NotifText.Text = msg
+        NotifText.TextSize = 14
+        NotifFrame:TweenPosition(UDim2.new(1, -215, 0.8, 0), "Out", "Quart", 0.5, true)
+        task.delay(3, function()
+            if NotifFrame and NotifFrame.Parent then
+                NotifFrame:TweenPosition(UDim2.new(1, 10, 0.8, 0), "In", "Quart", 0.5, true)
+                task.wait(0.5)
+                NotifFrame:Destroy()
+            end
+        end)
+    end
+end
+
+-- ==================== USELESS FLING LOGIC ====================
+ForceInput.FocusLost:Connect(function()
+    local val = tonumber(ForceInput.Text)
+    if val and val > 0 then pushForce = val else ForceInput.Text = tostring(pushForce) end
+end)
+
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Maxus-Shiftlock-55223"))()
+    end)
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") then
+        lp.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+lp.DevEnableMouseLock = true
+
+RunService.Stepped:Connect(function()
+    if lp.Character and hiddenfling then
+        if lp.Character:FindFirstChild("Humanoid") then
+            lp.Character.Humanoid.WalkSpeed = 25 
+        end
+        for _, v in pairs(lp.Character:GetDescendants()) do
+            if v:IsA("BasePart") then 
+                v.CanCollide = false 
+                v.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5)
+            end
+        end
+    elseif lp.Character and not hiddenfling then
+        for _, v in pairs(lp.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CustomPhysicalProperties = nil end
+        end
+    end
+end)
+
+local function fling()
+    local movel = 0.1
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        bg = Instance.new("BodyGyro")
+        bg.Parent = lp.Character.HumanoidRootPart
+        bg.P = 9e4
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bg.CFrame = lp.Character.HumanoidRootPart.CFrame
+    end
+
+    while hiddenfling do
+        RunService.Heartbeat:Wait()
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if bg then bg.CFrame = hrp.CFrame end
+            local targetNearby = false
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    if (hrp.Position - p.Character.HumanoidRootPart.Position).Magnitude <= HITBOX_RADIUS then
+                        targetNearby = true
+                        break
+                    end
+                end
+            end
+            if targetNearby then
+                local vel = hrp.Velocity
+                hrp.Velocity = vel * pushForce + Vector3.new(0, pushForce, 0)
+                RunService.RenderStepped:Wait()
+                hrp.Velocity = vel
+                RunService.Stepped:Wait()
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = -movel
+            end
+        end
+    end
+    if bg then bg:Destroy() bg = nil end
+end
+
+FlingToggle.MouseButton1Click:Connect(function()
+    hiddenfling = not hiddenfling
+    FlingToggle.Text = hiddenfling and "USELESS FLING: ON" or "USELESS FLING: OFF"
+    FlingToggle.TextColor3 = hiddenfling and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(200, 200, 200)
+    if hiddenfling then
+        task.spawn(fling)
+    else
+        if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+            lp.Character.Humanoid.WalkSpeed = 35
+        end
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Velocity = Vector3.new(0,0,0)
+            hrp.RotVelocity = Vector3.new(0,0,0)
+        end
+    end
+end)
+
+-- ==================== COIN COLLECTOR LOGIC ====================
+local function applyESP(part)
+    if not part:FindFirstChild("CoinESP") then
+        local cylinder = Instance.new("CylinderHandleAdornment")
+        cylinder.Name = "CoinESP"
+        cylinder.Height = COIN_SIZE.Y + 0.2
+        cylinder.Radius = COIN_SIZE.X / 2
+        cylinder.AlwaysOnTop = true
+        cylinder.Adornee = part
+        cylinder.Color3 = Color3.fromRGB(255, 255, 50)
+        cylinder.Transparency = 0.3 
+        cylinder.CFrame = CFrame.Angles(math.rad(90), 0, 0)
+        cylinder.Parent = part
+    end
+end
+
+local function isLavaActive()
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v.Name:find("Lava") and v:IsA("BasePart") and v.Transparency < 1 and v.CanTouch == true then
+            if v.Size.X > 10 and v.Size.Z > 10 then return true end
+        end
+    end
+    return false
+end
+
+local function startCollecting()
+    while collectorActive do
+        local character = lp.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if root then
+            if isLavaActive() then
+                notify("Lava Active - Teleporting Back")
+                if LastPos then root.CFrame = LastPos end
+                task.wait(2)
+            else
+                local items = workspace:GetDescendants()
+                local coins = {}
+                local diamonds = {}
+
+                for _, obj in ipairs(items) do
+                    if obj:IsA("BasePart") then
+                        if obj.Name == "Coin1" then
+                            table.insert(diamonds, obj)
+                            DiamondPos = obj.CFrame * CFrame.new(0, 10, 0) 
+                        elseif obj.Name:match("Coin") then
+                            local num = tonumber(obj.Name:match("%d+"))
+                            if num and num >= 2 and num <= 10 then 
+                                table.insert(coins, obj) 
+                            end
+                        end
+                    end
+                end
+
+                if #coins == 0 and #diamonds == 0 then
+                    collectorActive = false
+                    CollectorToggle.Text = "COIN COLLECTOR: OFF"
+                    CollectorToggle.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+                    
+                    if DiamondPos then 
+                        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                        root.AssemblyAngularVelocity = Vector3.new(0,0,0)
+                        root.CFrame = DiamondPos 
+                        root.Anchored = true
+                        task.wait(2)
+                        root.Anchored = false
+                    end
+                    
+                    notify("Collection Complete")
+                    break
+                end
+
+                for _, coin in ipairs(coins) do
+                    if not collectorActive or isLavaActive() then break end
+                    applyESP(coin)
+                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    root.CFrame = coin.CFrame
+                    root.Anchored = true
+                    firetouchinterest(root, coin, 0)
+                    task.wait(0.1)
+                    firetouchinterest(root, coin, 1)
+                    root.Anchored = false
+                    task.wait(0.05)
+                end
+
+                for _, diamond in ipairs(diamonds) do
+                    if not collectorActive or isLavaActive() then break end
+                    DiamondPos = diamond.CFrame * CFrame.new(0, 10, 0)
+                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    root.CFrame = DiamondPos
+                    root.Anchored = true
+                    firetouchinterest(root, diamond, 0)
+                    task.wait(0.1)
+                    firetouchinterest(root, diamond, 1)
+                    root.Anchored = false
+                    task.wait(0.05)
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end
+
+CollectorToggle.MouseButton1Click:Connect(function()
+    collectorActive = not collectorActive
+    if collectorActive then
+        local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if root then 
+            LastPos = root.CFrame 
+            DiamondPos = nil 
+        end
+        CollectorToggle.Text = "COIN COLLECTOR: ON"
+        CollectorToggle.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        task.spawn(startCollecting)
+    else
+        CollectorToggle.Text = "COIN COLLECTOR: OFF"
+        CollectorToggle.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if root then root.Anchored = false end
+    end
+end)
+
+-- ==================== LAVA FLING LOGIC ====================
+RunService.Stepped:Connect(function()
+    if (lavaSingleActive or lavaAllActive) and lp.Character then
+        for _, part in ipairs(lp.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+local function getTarget()
+    local text = TargetInput.Text:lower()
+    if text == "" then return nil end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if (p.Name:lower():sub(1, #text) == text or p.DisplayName:lower():sub(1, #text) == text) and p ~= lp then
+            return p
+        end
+    end
+    return nil
+end
+
+local function applyMovers(part, targetPos)
+    local bp = part:FindFirstChild("BH_P") or Instance.new("BodyPosition")
+    bp.Name = "BH_P"
+    bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bp.P = 50000
+    bp.Position = targetPos
+    bp.Parent = part
+
+    local bav = part:FindFirstChild("BH_V") or Instance.new("BodyAngularVelocity")
+    bav.Name = "BH_V"
+    bav.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bav.AngularVelocity = Vector3.new(300, 300, 300)
+    bav.Parent = part
+end
+
+local function cleanPart(part)
+    if part:FindFirstChild("BH_P") then part.BH_P:Destroy() end
+    if part:FindFirstChild("BH_V") then part.BH_V:Destroy() end
+end
+
+task.spawn(function()
+    while true do
+        if lavaSingleActive or lavaAllActive then
+            local myChar = lp.Character
+            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            
+            local targets = {}
+            if lavaAllActive then
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        table.insert(targets, p.Character.HumanoidRootPart)
+                    end
+                end
+            else
+                local t = getTarget()
+                if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+                    table.insert(targets, t.Character.HumanoidRootPart)
+                end
+            end
+
+            if #targets > 0 and myRoot then
+                local unanchoredParts = {}
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(myChar) then
+                        table.insert(unanchoredParts, obj)
+                    end
+                end
+
+                for i, obj in ipairs(unanchoredParts) do
+                    local targetRoot = targets[(i % #targets) + 1]
+                    local predictedPos = targetRoot.Position + (targetRoot.Velocity * 0.25)
+                    
+                    local isBodyPart = false
+                    for _, root in ipairs(targets) do
+                        if obj:IsDescendantOf(root.Parent) then isBodyPart = true break end
+                    end
+
+                    if not isBodyPart then
+                        applyMovers(obj, predictedPos)
+                        if (obj.Position - myRoot.Position).Magnitude < 10 then
+                            cleanPart(obj)
+                        end
+                    end
+                end
+            end
+        else
+            -- Clean up when both modes are off
+            if not lavaSingleActive and not lavaAllActive then
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") then cleanPart(obj) end
+                end
+            end
+        end
+        task.wait(0.03)
+    end
+end)
+
+LavaSingleToggle.MouseButton1Click:Connect(function()
+    lavaSingleActive = not lavaSingleActive
+    lavaAllActive = false
+    LavaAllToggle.Text = "LAVA FLING ALL: OFF"
+    LavaAllToggle.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+    LavaSingleToggle.Text = lavaSingleActive and "LAVA FLING SINGLE: ON" or "LAVA FLING SINGLE: OFF"
+    LavaSingleToggle.BackgroundColor3 = lavaSingleActive and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(200, 80, 0)
+end)
+
+LavaAllToggle.MouseButton1Click:Connect(function()
+    lavaAllActive = not lavaAllActive
+    lavaSingleActive = false
+    LavaSingleToggle.Text = "LAVA FLING SINGLE: OFF"
+    LavaSingleToggle.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
+    LavaAllToggle.Text = lavaAllActive and "LAVA FLING ALL: ON" or "LAVA FLING ALL: OFF"
+    LavaAllToggle.BackgroundColor3 = lavaAllActive and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(100, 0, 255)
+end)
+
+-- Done! All three scripts are now unified with independent toggles.
