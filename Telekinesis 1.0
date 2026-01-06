@@ -1,233 +1,238 @@
 --[[
-    UNIVERSAL MOBILE TELEKINESIS TOOL V2
-    Type: Inventory Tool (Equippable)
-    Physics: Infinite Strength (God Grab)
-    UI: Charcoal Theme (Auto-Hide)
+    UNIVERSAL MOBILE TELEKINESIS TOOL V3
+    System: Center-Screen Raycast (FPS Style)
+    Physics: CFrame Locking + Velocity Reset
+    Visuals: Auto-Scanner for Movable Parts
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
 --// SETTINGS
-local REACH = 500 -- Max grab distance
-local PUSH_SPEED = 1.5 -- Speed of push/pull
+local REACH = 300
+local PUSH_SPEED = 1
 local THEME_COLOR = Color3.fromRGB(54, 69, 79) -- Charcoal
-local ACCENT_COLOR = Color3.fromRGB(80, 100, 110)
 local TEXT_COLOR = Color3.fromRGB(240, 240, 240)
+local HIGHLIGHT_COLOR = Color3.fromRGB(100, 255, 100) -- Green for movable parts
 
 --// STATE
-local ToolEquipped = false
 local Holding = false
 local TargetPart = nil
 local BodyPos = nil
 local BodyGyro = nil
 local CurrentDistance = 15
-local GrabLoop = nil
-local InputLoop = nil
+local HeartbeatConnection = nil
 
 --// CREATE TOOL
 local TKTool = Instance.new("Tool")
-TKTool.Name = "Charcoal TK"
-TKTool.RequiresHandle = false -- No physical handle needed for script tools
+TKTool.Name = "Charcoal TK v3"
+TKTool.RequiresHandle = false
 TKTool.Parent = LocalPlayer:WaitForChild("Backpack")
 
 --// UI CREATION
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
-local StatusLabel = Instance.new("TextLabel")
+local Crosshair = Instance.new("Frame") -- The aim dot
 local PushBtn = Instance.new("TextButton")
 local PullBtn = Instance.new("TextButton")
 local GrabBtn = Instance.new("TextButton")
+local ScannerLabel = Instance.new("TextLabel")
 
--- Protect GUI
-if gethui then
-    ScreenGui.Parent = gethui()
-elseif syn and syn.protect_gui then 
-    syn.protect_gui(ScreenGui)
-    ScreenGui.Parent = CoreGui
-else
-    ScreenGui.Parent = CoreGui
-end
+if gethui then ScreenGui.Parent = gethui()
+elseif syn and syn.protect_gui then syn.protect_gui(ScreenGui) ScreenGui.Parent = CoreGui
+else ScreenGui.Parent = CoreGui end
 
-ScreenGui.Name = "CharcoalTK_V2_UI"
+ScreenGui.Name = "CharcoalTK_V3"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Enabled = false -- Hidden by default until tool is equipped
+ScreenGui.Enabled = false
 
---// UI STYLING
-MainFrame.Name = "Controls"
+--// CROSSHAIR (Aim Dot)
+Crosshair.Name = "Crosshair"
+Crosshair.Parent = ScreenGui
+Crosshair.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+Crosshair.Position = UDim2.new(0.5, -3, 0.5, -3) -- Dead center
+Crosshair.Size = UDim2.new(0, 6, 0, 6)
+Crosshair.BorderSizePixel = 0
+Instance.new("UICorner", Crosshair).CornerRadius = UDim.new(1, 0)
+
+--// MAIN CONTROL FRAME
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = THEME_COLOR
-MainFrame.Position = UDim2.new(0.75, 0, 0.55, 0) -- Bottom Right (Thumb area)
-MainFrame.Size = UDim2.new(0, 120, 0, 180)
-MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.8, -60, 0.4, 0) -- Right side
+MainFrame.Size = UDim2.new(0, 120, 0, 200)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 12)
-MainCorner.Parent = MainFrame
+-- Scanner Info
+ScannerLabel.Parent = MainFrame
+ScannerLabel.BackgroundTransparency = 1
+ScannerLabel.Position = UDim2.new(0,0,0,5)
+ScannerLabel.Size = UDim2.new(1,0,0,20)
+ScannerLabel.Text = "Green = Movable"
+ScannerLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+ScannerLabel.Font = Enum.Font.GothamBold
+ScannerLabel.TextSize = 12
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(30, 30, 30)
-UIStroke.Thickness = 2
-UIStroke.Parent = MainFrame
-
--- Status Text
-StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Position = UDim2.new(0, 0, 0, 5)
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Font = Enum.Font.GothamBold
-StatusLabel.Text = "TK READY"
-StatusLabel.TextColor3 = TEXT_COLOR
-StatusLabel.TextSize = 14
-
--- Grab Button (Big Center Button)
+-- Grab Button
 GrabBtn.Parent = MainFrame
-GrabBtn.BackgroundColor3 = ACCENT_COLOR
+GrabBtn.BackgroundColor3 = Color3.fromRGB(80, 100, 110)
 GrabBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 GrabBtn.Size = UDim2.new(0.8, 0, 0.3, 0)
-GrabBtn.Font = Enum.Font.GothamBold
 GrabBtn.Text = "GRAB"
+GrabBtn.Font = Enum.Font.GothamBlack
 GrabBtn.TextColor3 = TEXT_COLOR
-GrabBtn.TextSize = 18
-
-local GrabCorner = Instance.new("UICorner")
-GrabCorner.CornerRadius = UDim.new(0, 8)
-GrabCorner.Parent = GrabBtn
+GrabBtn.TextSize = 20
+Instance.new("UICorner", GrabBtn).CornerRadius = UDim.new(0, 8)
 
 -- Push Button
 PushBtn.Parent = MainFrame
-PushBtn.BackgroundColor3 = ACCENT_COLOR
+PushBtn.BackgroundColor3 = Color3.fromRGB(70, 90, 100)
 PushBtn.Position = UDim2.new(0.1, 0, 0.55, 0)
 PushBtn.Size = UDim2.new(0.35, 0, 0.35, 0)
+PushBtn.Text = "+"
 PushBtn.Font = Enum.Font.GothamBold
-PushBtn.Text = "PUSH"
 PushBtn.TextColor3 = TEXT_COLOR
-PushBtn.TextSize = 12
+PushBtn.TextSize = 24
 Instance.new("UICorner", PushBtn).CornerRadius = UDim.new(0, 8)
 
 -- Pull Button
 PullBtn.Parent = MainFrame
-PullBtn.BackgroundColor3 = ACCENT_COLOR
+PullBtn.BackgroundColor3 = Color3.fromRGB(70, 90, 100)
 PullBtn.Position = UDim2.new(0.55, 0, 0.55, 0)
 PullBtn.Size = UDim2.new(0.35, 0, 0.35, 0)
+PullBtn.Text = "-"
 PullBtn.Font = Enum.Font.GothamBold
-PullBtn.Text = "PULL"
 PullBtn.TextColor3 = TEXT_COLOR
-PullBtn.TextSize = 12
+PullBtn.TextSize = 24
 Instance.new("UICorner", PullBtn).CornerRadius = UDim.new(0, 8)
 
---// HIGHLIGHTER (SELECTION BOX)
-local Highlighter = Instance.new("SelectionBox")
-Highlighter.Name = "TK_Highlight"
-Highlighter.Color3 = Color3.fromRGB(255, 50, 50) -- Red
-Highlighter.LineThickness = 0.05
-Highlighter.Adornee = nil
-Highlighter.Parent = ScreenGui
+--// SCANNER SYSTEM (Highlight Unanchored Parts)
+local HighlightsFolder = Instance.new("Folder")
+HighlightsFolder.Name = "TK_Highlights"
+HighlightsFolder.Parent = CoreGui
 
---// PHYSICS FUNCTIONS
+local function ScanForParts()
+    -- Clear old highlights
+    HighlightsFolder:ClearAllChildren()
+    
+    for _, part in pairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored and not part:IsDescendantOf(LocalPlayer.Character) then
+            -- Avoid highlighting huge baseplates or tiny debris
+            if part.Size.Magnitude > 1 and part.Size.Magnitude < 100 then
+                local hl = Instance.new("BoxHandleAdornment")
+                hl.Name = "ScannerHighlight"
+                hl.Adornee = part
+                hl.Size = part.Size
+                hl.Color3 = HIGHLIGHT_COLOR
+                hl.Transparency = 0.6
+                hl.AlwaysOnTop = true
+                hl.ZIndex = 0
+                hl.Parent = HighlightsFolder
+            end
+        end
+    end
+end
+
+--// PHYSICS ENGINE
+
+local function GetCameraRay(distance)
+    local viewportSize = Camera.ViewportSize
+    local unitRay = Camera:ScreenPointToRay(viewportSize.X / 2, viewportSize.Y / 2)
+    return Ray.new(unitRay.Origin, unitRay.Direction * distance)
+end
 
 local function Release()
     Holding = false
     GrabBtn.Text = "GRAB"
-    GrabBtn.BackgroundColor3 = ACCENT_COLOR
-    Highlighter.Adornee = nil
+    GrabBtn.BackgroundColor3 = Color3.fromRGB(80, 100, 110)
+    Crosshair.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     
     if BodyPos then BodyPos:Destroy() BodyPos = nil end
     if BodyGyro then BodyGyro:Destroy() BodyGyro = nil end
+    if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
     
-    if GrabLoop then GrabLoop:Disconnect() GrabLoop = nil end
-    
-    -- Reset target physics slightly
-    if TargetPart then
-        TargetPart.Velocity = Vector3.new(0,0,0)
-        TargetPart.RotVelocity = Vector3.new(0,0,0)
-    end
     TargetPart = nil
 end
 
 local function Grab()
-    local target = Mouse.Target
+    local ray = GetCameraRay(REACH)
+    local hitPart, hitPos = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
     
-    if target and not target.Anchored then
-        TargetPart = target
+    if hitPart and not hitPart.Anchored then
+        TargetPart = hitPart
         Holding = true
         GrabBtn.Text = "DROP"
-        GrabBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80) -- Reddish for drop
+        GrabBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        Crosshair.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Turn green on grab
         
-        -- Highlight the part so you know you have it
-        Highlighter.Adornee = target
+        -- Set Distance
+        CurrentDistance = (Camera.CFrame.Position - hitPart.Position).Magnitude
+        if CurrentDistance < 5 then CurrentDistance = 10 end
 
-        -- Calculate distance
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-            CurrentDistance = (LocalPlayer.Character.Head.Position - target.Position).Magnitude
-        end
-        
-        -- Strong Movers
+        -- Create Physics Movers
         BodyPos = Instance.new("BodyPosition")
-        BodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- INFINITE POWER
-        BodyPos.P = 10000 -- Quick response
-        BodyPos.D = 800 -- Dampening to prevent flinging too hard
-        BodyPos.Position = target.Position
-        BodyPos.Parent = target
+        BodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        BodyPos.D = 400 -- Lower damping = snappier
+        BodyPos.P = 15000 -- High power
+        BodyPos.Position = hitPart.Position
+        BodyPos.Parent = hitPart
         
         BodyGyro = Instance.new("BodyGyro")
-        BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge) -- INFINITE ROTATION POWER
-        BodyGyro.CFrame = target.CFrame
-        BodyGyro.P = 10000
-        BodyGyro.Parent = target
-        
-        -- Try to take ownership (Reduces lag)
-        for _, v in pairs(target:GetDescendants()) do
-            if v:IsA("BasePart") then
-                pcall(function() v:SetNetworkOwner(LocalPlayer) end)
-            end
-        end
-        pcall(function() target:SetNetworkOwner(LocalPlayer) end)
+        BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        BodyGyro.CFrame = hitPart.CFrame
+        BodyGyro.D = 400
+        BodyGyro.P = 15000
+        BodyGyro.Parent = hitPart
 
-        -- Loop to update position
-        GrabLoop = RunService.RenderStepped:Connect(function()
+        -- Network Ownership Claim Loop
+        task.spawn(function()
+            while Holding and TargetPart do
+                pcall(function() TargetPart:SetNetworkOwner(LocalPlayer) end)
+                task.wait(1)
+            end
+        end)
+
+        -- Update Loop
+        HeartbeatConnection = RunService.RenderStepped:Connect(function()
             if not TargetPart or not TargetPart.Parent or not Holding then
                 Release()
                 return
             end
             
-            local look = Camera.CFrame.LookVector
-            local newPos = Camera.CFrame.Position + (look * CurrentDistance)
+            -- Keep part upright relative to camera or let it rotate freely?
+            -- Let's lock it to camera rotation for better control
+            local desiredPos = Camera.CFrame.Position + (Camera.CFrame.LookVector * CurrentDistance)
             
-            BodyPos.Position = newPos
+            BodyPos.Position = desiredPos
             BodyGyro.CFrame = Camera.CFrame
+            
+            -- Prevent velocity buildup (fling fix)
+            TargetPart.Velocity = Vector3.new(0,0,0)
+            TargetPart.RotVelocity = Vector3.new(0,0,0)
         end)
     else
-        GrabBtn.Text = "NO TARGET"
+        GrabBtn.Text = "MISS"
         task.wait(0.5)
         if not Holding then GrabBtn.Text = "GRAB" end
     end
 end
 
---// BUTTON INPUTS
+--// CONTROLS
 GrabBtn.MouseButton1Click:Connect(function()
     if Holding then Release() else Grab() end
 end)
-
--- Push / Pull Logic
-local function AdjustDistance(amount)
-    if Holding then
-        CurrentDistance = math.clamp(CurrentDistance + amount, 2, REACH)
-    end
-end
 
 local Pushing = false
 PushBtn.MouseButton1Down:Connect(function()
     Pushing = true
     while Pushing do
-        AdjustDistance(PUSH_SPEED)
-        task.wait(0.05)
+        CurrentDistance = CurrentDistance + PUSH_SPEED
+        task.wait(0.03)
     end
 end)
 PushBtn.MouseButton1Up:Connect(function() Pushing = false end)
@@ -237,37 +242,32 @@ local Pulling = false
 PullBtn.MouseButton1Down:Connect(function()
     Pulling = true
     while Pulling do
-        AdjustDistance(-PUSH_SPEED)
-        task.wait(0.05)
+        CurrentDistance = math.max(5, CurrentDistance - PUSH_SPEED)
+        task.wait(0.03)
     end
 end)
 PullBtn.MouseButton1Up:Connect(function() Pulling = false end)
 PullBtn.MouseLeave:Connect(function() Pulling = false end)
 
-
---// TOOL EVENTS
+--// TOOL HANDLERS
 TKTool.Equipped:Connect(function()
-    ToolEquipped = true
     ScreenGui.Enabled = true
-    StatusLabel.Text = "TK ACTIVE"
+    ScanForParts() -- Run scanner when equipped
 end)
 
 TKTool.Unequipped:Connect(function()
-    ToolEquipped = false
     ScreenGui.Enabled = false
+    HighlightsFolder:ClearAllChildren() -- Hide highlights when not using tool
     if Holding then Release() end
 end)
 
--- Allow clicking screen to grab (alternative to UI button)
 TKTool.Activated:Connect(function()
-    if not Holding then
-        Grab()
-    end
+    if not Holding then Grab() end
 end)
 
 --// NOTIFICATION
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Charcoal TK V2";
-    Text = "Check your Backpack for the Tool!";
-    Duration = 5;
+    Title = "TK V3 Loaded";
+    Text = "Equip 'Charcoal TK v3' to start.";
+    Duration = 4;
 })
