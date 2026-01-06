@@ -1,0 +1,249 @@
+--[[
+    UNIVERSAL MOBILE TELEKINESIS TOOL
+    Interface: Charcoal Theme
+    Platform: Mobile (Touch) & PC
+    Version: 1.0 (Standalone)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+--// SETTINGS
+local REACH = 200 -- Max grab distance
+local HOLD_DISTANCE = 15 -- Default holding distance
+local PUSH_SPEED = 1 -- How fast push/pull works
+local THEME_COLOR = Color3.fromRGB(54, 69, 79) -- Charcoal
+local TEXT_COLOR = Color3.fromRGB(240, 240, 240) -- Off-White
+local ACCENT_COLOR = Color3.fromRGB(80, 100, 110) -- Lighter Charcoal
+
+--// VARIABLES
+local Holding = false
+local TargetPart = nil
+local BodyPos = nil
+local BodyGyro = nil
+local CurrentDistance = HOLD_DISTANCE
+local Connection = nil
+
+--// UI CREATION
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local ToggleBtn = Instance.new("TextButton")
+local PushBtn = Instance.new("TextButton")
+local PullBtn = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+
+-- Protect GUI from game resets
+if gethui then
+    ScreenGui.Parent = gethui()
+elseif syn and syn.protect_gui then 
+    syn.protect_gui(ScreenGui)
+    ScreenGui.Parent = CoreGui
+else
+    ScreenGui.Parent = CoreGui
+end
+
+ScreenGui.Name = "CharcoalTK_Mobile"
+ScreenGui.ResetOnSpawn = false
+
+--// MAIN FRAME (Charcoal Interface)
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = THEME_COLOR
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0) -- Left side for thumb access
+MainFrame.Size = UDim2.new(0, 140, 0, 230)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Allows moving the UI
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(30, 30, 30)
+MainStroke.Thickness = 2
+MainStroke.Parent = MainFrame
+
+--// TITLE
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 5)
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Universal TK"
+Title.TextColor3 = TEXT_COLOR
+Title.TextSize = 14
+
+--// TOGGLE BUTTON (Grab/Release)
+ToggleBtn.Name = "Toggle"
+ToggleBtn.Parent = MainFrame
+ToggleBtn.BackgroundColor3 = ACCENT_COLOR
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.15, 0)
+ToggleBtn.Size = UDim2.new(0.8, 0, 0.25, 0)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "GRAB"
+ToggleBtn.TextColor3 = TEXT_COLOR
+ToggleBtn.TextSize = 18
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 8)
+BtnCorner.Parent = ToggleBtn
+
+--// PUSH BUTTON (+)
+PushBtn.Name = "Push"
+PushBtn.Parent = MainFrame
+PushBtn.BackgroundColor3 = ACCENT_COLOR
+PushBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+PushBtn.Size = UDim2.new(0.35, 0, 0.2, 0)
+PushBtn.Font = Enum.Font.Gotham
+PushBtn.Text = "PUSH"
+PushBtn.TextColor3 = TEXT_COLOR
+PushBtn.TextSize = 12
+
+local PushCorner = Instance.new("UICorner")
+PushCorner.CornerRadius = UDim.new(0, 6)
+PushCorner.Parent = PushBtn
+
+--// PULL BUTTON (-)
+PullBtn.Name = "Pull"
+PullBtn.Parent = MainFrame
+PullBtn.BackgroundColor3 = ACCENT_COLOR
+PullBtn.Position = UDim2.new(0.55, 0, 0.45, 0)
+PullBtn.Size = UDim2.new(0.35, 0, 0.2, 0)
+PullBtn.Font = Enum.Font.Gotham
+PullBtn.Text = "PULL"
+PullBtn.TextColor3 = TEXT_COLOR
+PullBtn.TextSize = 12
+
+local PullCorner = Instance.new("UICorner")
+PullCorner.CornerRadius = UDim.new(0, 6)
+PullCorner.Parent = PullBtn
+
+--// STATUS & INSTRUCTIONS
+StatusLabel.Parent = MainFrame
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0.1, 0, 0.7, 0)
+StatusLabel.Size = UDim2.new(0.8, 0, 0.25, 0)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Status: Idle\nTarget unanchored parts"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.TextSize = 11
+StatusLabel.TextWrapped = true
+
+--// FUNCTIONS
+
+local function StopHolding()
+    Holding = false
+    ToggleBtn.Text = "GRAB"
+    ToggleBtn.BackgroundColor3 = ACCENT_COLOR
+    StatusLabel.Text = "Status: Idle"
+    
+    if BodyPos then BodyPos:Destroy() BodyPos = nil end
+    if BodyGyro then BodyGyro:Destroy() BodyGyro = nil end
+    
+    TargetPart = nil
+    if Connection then Connection:Disconnect() Connection = nil end
+end
+
+local function StartHolding()
+    local target = Mouse.Target
+    
+    if target and not target.Anchored then
+        TargetPart = target
+        Holding = true
+        ToggleBtn.Text = "RELEASE"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 100) -- Greenish tint when holding
+        StatusLabel.Text = "Holding: " .. target.Name
+        
+        -- Set initial distance
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+            CurrentDistance = (LocalPlayer.Character.Head.Position - target.Position).Magnitude
+        end
+
+        -- Create Movers
+        BodyPos = Instance.new("BodyPosition")
+        BodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        BodyPos.D = 600
+        BodyPos.P = 20000
+        BodyPos.Position = target.Position
+        BodyPos.Parent = target
+        
+        BodyGyro = Instance.new("BodyGyro")
+        BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        BodyGyro.CFrame = target.CFrame
+        BodyGyro.D = 500
+        BodyGyro.P = 3000
+        BodyGyro.Parent = target
+        
+        -- Network Ownership (Prevents lag/jitter)
+        pcall(function()
+            target:SetNetworkOwner(LocalPlayer)
+        end)
+
+        -- Update Loop
+        Connection = RunService.RenderStepped:Connect(function()
+            if not TargetPart or not TargetPart.Parent or not Holding then
+                StopHolding()
+                return
+            end
+            
+            local lookVector = Camera.CFrame.LookVector
+            local newPos = Camera.CFrame.Position + (lookVector * CurrentDistance)
+            
+            BodyPos.Position = newPos
+            BodyGyro.CFrame = Camera.CFrame
+        end)
+    else
+        StatusLabel.Text = "Error: Too far or Anchored"
+        task.wait(1)
+        StatusLabel.Text = "Status: Idle"
+    end
+end
+
+--// BUTTON EVENTS
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    if Holding then
+        StopHolding()
+    else
+        StartHolding()
+    end
+end)
+
+-- Push (Increase Distance)
+local Pushing = false
+PushBtn.MouseButton1Down:Connect(function()
+    Pushing = true
+    while Pushing do
+        CurrentDistance = CurrentDistance + PUSH_SPEED
+        task.wait(0.05)
+    end
+end)
+PushBtn.MouseButton1Up:Connect(function() Pushing = false end)
+PushBtn.MouseLeave:Connect(function() Pushing = false end)
+
+-- Pull (Decrease Distance)
+local Pulling = false
+PullBtn.MouseButton1Down:Connect(function()
+    Pulling = true
+    while Pulling do
+        if CurrentDistance > 2 then
+            CurrentDistance = CurrentDistance - PUSH_SPEED
+        end
+        task.wait(0.05)
+    end
+end)
+PullBtn.MouseButton1Up:Connect(function() Pulling = false end)
+PullBtn.MouseLeave:Connect(function() Pulling = false end)
+
+--// INITIALIZATION
+print("Charcoal Mobile TK Loaded")
