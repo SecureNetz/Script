@@ -1,126 +1,118 @@
 --[[
-    UNIVERSAL TELEKINESIS V4 (PC OPTIMIZED)
-    Keybinds: [Q] Grab/Drop  |  [E] Push  |  [R] Pull
-    Logic: CFrame Velocity Nullification
+    UNIVERSAL TELEKINESIS V5 (ULTIMATE OVERRIDE)
+    Fixes: Self-Grabbing, Character Flinging, and Ownership Jitter
+    Controls: [Q] Grab/Release | [E/R] Push/Pull | [Scroll] Distance
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local UIS = game:GetService("UserInputService")
+
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
-local Camera = game.Workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
 
 --// CONFIG
-local SETTINGS = {
-    Reach = 500,
-    PushSpeed = 2,
-    Charcoal = Color3.fromRGB(40, 40, 40),
-    Accent = Color3.fromRGB(60, 60, 60),
-    TextColor = Color3.fromRGB(255, 255, 255)
-}
-
---// STATE
+local Reach = 1000
+local PushSpeed = 5
+local Distance = 20
 local Target = nil
-local Distance = 15
 local IsHolding = false
-local VisualBox = nil
 
---// UI SYSTEM
+--// UI (Charcoal Theme)
 local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 150, 0, 80)
-Main.Position = UDim2.new(0, 50, 0.5, -40)
-Main.BackgroundColor3 = SETTINGS.Charcoal
-Main.BorderSizePixel = 0
+local Indicator = Instance.new("Frame", ScreenGui)
+Indicator.Size = UDim2.new(0, 120, 0, 40)
+Indicator.Position = UDim2.new(0.5, -60, 0.1, 0)
+Indicator.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Indicator.BorderSizePixel = 0
 
-local Corner = Instance.new("UICorner", Main)
-local Status = Instance.new("TextLabel", Main)
+local Status = Instance.new("TextLabel", Indicator)
 Status.Size = UDim2.new(1, 0, 1, 0)
-Status.BackgroundTransparency = 1
-Status.TextColor3 = SETTINGS.TextColor
+Status.TextColor3 = Color3.fromRGB(200, 200, 200)
+Status.Text = "READY [Q]"
 Status.Font = Enum.Font.Code
-Status.Text = "READY\n[Q] TO GRAB"
-Status.TextSize = 14
+Status.BackgroundTransparency = 1
 
---// HIGHLIGHTER
-local function CreateHighlight()
-    local box = Instance.new("SelectionBox")
-    box.Color3 = Color3.fromRGB(0, 255, 255)
-    box.LineThickness = 0.05
-    box.Parent = game:GetService("CoreGui")
-    return box
-end
-VisualBox = CreateHighlight()
-
---// THE PHYSICS CORE
-local function GetTarget()
-    local target = Mouse.Target
-    if target and not target.Anchored and target:IsA("BasePart") then
-        return target
-    end
-    return nil
-end
-
-local function Grab()
-    local part = GetTarget()
-    if part then
-        Target = part
-        IsHolding = true
-        Distance = (Camera.CFrame.Position - part.Position).Magnitude
-        Status.Text = "HOLDING:\n" .. part.Name:sub(1, 15)
-        VisualBox.Adornee = Target
-        
-        -- Attempt to bypass FE Ownership
-        pcall(function()
-            Target.CanCollide = false -- Helps prevent getting stuck on terrain
-            Target:SetNetworkOwner(nil) -- Sometimes works to reset ownership
-        end)
-    end
+--// LOGIC
+local function IsMovable(part)
+    if not part or not part:IsA("BasePart") then return false end
+    if part.Anchored then return false end
+    if part:IsDescendantOf(LocalPlayer.Character) then return false end -- NEVER GRAB SELF
+    return true
 end
 
 local function Release()
     if Target then
-        pcall(function() Target.CanCollide = true end)
+        -- Restore physics state
+        pcall(function()
+            Target.CanCollide = true
+            Target.Velocity = Vector3.new(0,0,0)
+        end)
     end
     Target = nil
     IsHolding = false
-    VisualBox.Adornee = nil
-    Status.Text = "READY\n[Q] TO GRAB"
+    Status.Text = "READY [Q]"
+    Status.TextColor3 = Color3.fromRGB(200, 200, 200)
 end
 
---// MAIN LOOP
-RunService.Stepped:Connect(function()
+local function Grab()
+    local hit = Mouse.Target
+    if hit and IsMovable(hit) then
+        Target = hit
+        IsHolding = true
+        Distance = (Camera.CFrame.Position - hit.Position).Magnitude
+        Status.Text = "HOLDING: " .. hit.Name:sub(1,10)
+        Status.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        -- Disable collision with player to prevent flinging
+        pcall(function()
+            Target.CanCollide = false
+        end)
+    else
+        Status.Text = "INVALID TARGET"
+        task.wait(0.5)
+        if not IsHolding then Status.Text = "READY [Q]" end
+    end
+end
+
+--// THE ENGINE
+RunService.RenderStepped:Connect(function()
     if IsHolding and Target then
-        if Target.Parent == nil or Target.Anchored then
+        if not Target.Parent or Target.Anchored then
             Release()
             return
         end
 
-        -- CALCULATE DESIRED POSITION
+        -- Calculate position in front of camera
         local unitRay = Mouse.UnitRay
-        local endPos = unitRay.Origin + (unitRay.Direction * Distance)
+        local targetPos = unitRay.Origin + (unitRay.Direction * Distance)
         
-        -- AGGRESSIVE PHYSICS OVERRIDE
-        -- We set Velocity to 1 unit to keep the physics engine "awake" 
-        -- but CFrame it to where we want it to be.
-        Target.Velocity = Vector3.new(0, 0.1, 0) 
+        -- FORCE CFRAME (The "Strongest" method)
+        Target.Velocity = Vector3.new(0, 0, 0)
         Target.RotVelocity = Vector3.new(0, 0, 0)
-        Target.CFrame = CFrame.new(endPos)
+        Target.CFrame = CFrame.new(targetPos)
     end
 end)
 
---// KEYBINDS
-UserInputService.InputBegan:Connect(function(input, gpe)
+--// INPUTS
+UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     
     if input.KeyCode == Enum.KeyCode.Q then
         if IsHolding then Release() else Grab() end
     elseif input.KeyCode == Enum.KeyCode.E then
-        Distance = math.min(SETTINGS.Reach, Distance + SETTINGS.PushSpeed)
+        Distance = Distance + PushSpeed
     elseif input.KeyCode == Enum.KeyCode.R then
-        Distance = math.max(5, Distance - SETTINGS.PushSpeed)
+        Distance = math.max(5, Distance - PushSpeed)
     end
 end)
 
-print("TK V4 Loaded - Use Q to Grab")
+-- Mouse Scroll support for PC users
+UIS.InputChanged:Connect(function(input)
+    if IsHolding and input.UserInputType == Enum.UserInputType.MouseWheel then
+        Distance = math.clamp(Distance + (input.Position.Z * Reach * 0.05), 5, Reach)
+    end
+end)
+
+print("TK V5: Character Filter Active")
