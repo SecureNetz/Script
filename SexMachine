@@ -1,10 +1,6 @@
 --[[
-
-
 ppl who using obfuscator: 🤡💩👶👎
 ppl who not using obfuscator: 😎🔥🔥🔥🍆💦🥛🍑🥵
-
-
 ]]
 
 local screen = Instance.new("ScreenGui")
@@ -458,7 +454,6 @@ local function lookAtTarget()
         local localHumanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         
         if targetHumanoidRootPart and localHumanoidRootPart then
-            -- Rotate the player to face the target
             local direction = (targetHumanoidRootPart.Position - localHumanoidRootPart.Position).unit
             local lookAtCFrame = CFrame.lookAt(localHumanoidRootPart.Position, targetHumanoidRootPart.Position)
             localHumanoidRootPart.CFrame = CFrame.new(localHumanoidRootPart.Position, targetHumanoidRootPart.Position)
@@ -475,13 +470,8 @@ local function startTeleport()
             local teleportLoop
             teleportLoop = game:GetService("RunService").Stepped:Connect(function(_, deltaTime)
                 if isTeleporting then
-                    -- Smoothly move player to the target offset
                     localRootPart.CFrame = localRootPart.CFrame:Lerp(targetRootPart.CFrame * currentOffset, deltaTime * speed)
-
-                    -- Make the player look at the target
                     lookAtTarget()
-
-                    -- Toggle offset based on time interval
                     if tick() - lastToggleTime >= toggleInterval then
                         currentOffset = (currentOffset == offset1) and offset2 or offset1
                         lastToggleTime = tick()
@@ -588,63 +578,28 @@ local function text(text)
         textanim.Parent = scrollframe2
 end
 
+-- ANIMATION LIST START
 text("Backshot V1")
-
 se("Slow backshot V1","182789003", "106772613", "10714360343", "182789003","0","0",1, 0, CFrame.new(0, 0, -1), CFrame.new(0, 0, -2), 10, 1)
-
 se("Default backshot V1","182789003", "106772613", "10714360343", "182789003","0","0",1, 0, CFrame.new(0, 0, -1), CFrame.new(0, 0, -2), 10, 0.5)
-
 se("Fast backshot V1","182789003", "106772613", "10714360343", "182789003","0","0",1, 0, CFrame.new(0, 0, -1), CFrame.new(0, 0, -2), 10, 0.2)
-
 se("Very Fast backshot V1","182789003", "106772613", "10714360343", "182789003","0","0",1, 0, CFrame.new(0, 0, -1), CFrame.new(0, 0, -2), 10, 0.05)
 
 text("Backshot V2")
-
 se("Slow backshot V2","182789003", "106772613", "10714360343", "182789003","182749109","179224234",1, 0, CFrame.new(0, 0, -1.3), CFrame.new(0, 0, -2), 10, 1)
-
 se("Default backshot V2","182789003", "106772613", "10714360343", "182789003","182749109","179224234",1, 0, CFrame.new(0, 0, -1.3), CFrame.new(0, 0, -2), 10, 0.5)
-
 se("Fast backshot V2","182789003", "106772613", "10714360343", "182789003","182749109","179224234",1, 0, CFrame.new(0, 0, -1.3), CFrame.new(0, 0, -2), 10, 0.2)
-
 se("Very Fast backshot V2","182789003", "106772613", "10714360343", "182789003","182749109","179224234",1, 0, CFrame.new(0, 0, -1.3), CFrame.new(0, 0, -2), 10, 0.05)
 
-text("Bang Players")
-
-se("Better Bang 1","148840371", "158821881", "0", "0","0","0",0, 5, CFrame.new(0, 0, 1), CFrame.new(0, 0, 1), 20, 0)
-
-text("BlowJob (need name)")
-
+text("BlowJob")
 se2("BlowJob 1","106772613", "182749109", "87684948", "182789003","182749109","180612465",1, 0, CFrame.new(0, 0, -3), CFrame.new(0, 0, -2), 4, 0.7)
+se2("Super Fast BJ","106772613", "182749109", "87684948", "182789003","182749109","181526230",1, 0, CFrame.new(0, 0, -2.5), CFrame.new(0, 0, -1.5), 4, 0.05)
 
-se2("BlowJob 2","106772613", "182749109", "87684948", "182789003","182749109","181526230",1, 0, CFrame.new(0, 0, -2.5), CFrame.new(0, 0, -1.5), 4, 0.7)
-
-se2("Fast BlowJob 2","106772613", "182749109", "87684948", "182789003","182749109","181526230",1.7, 0, CFrame.new(0, 0, -2.5), CFrame.new(0, 0, -1.5), 4, 0.3)
-
-se2("Super Fast BlowJob 2","106772613", "182749109", "87684948", "182789003","182749109","181526230",1, 0, CFrame.new(0, 0, -2.5), CFrame.new(0, 0, -1.5), 4, 0.05)
-
-text("front pussy (need name)")
-
-se2("Slow front","181526230", "180612465", "106772613", "106772613","106772613","0",1, 0, CFrame.new(0, 0, -2.5), CFrame.new (0, 0, -1.5), 10, 0.7)
-
-se2("Default front","181526230", "180612465", "106772613", "106772613","106772613","0",1, 0, CFrame.new(0, 0, -2.5), CFrame.new (0, 0, -1.5), 10, 0.4)
-
-se2("Fast front","181526230", "180612465", "106772613", "106772613","106772613","0",1, 0, CFrame.new(0, 0, -2.5), CFrame.new (0, 0, -1.5), 10, 0.2)
-
-se2("Very Fast front","181526230", "180612465", "106772613", "106772613","106772613","0",1, 0, CFrame.new(0, 0, -2.5), CFrame.new (0, 0, -1.5), 10, 0.05)
-
-text("Others")
-
-se2("Kiss","225975820", "283545583", "0", "0","0","0",0.2, 0, CFrame.new(0, 0, -1), CFrame.new (0, 0, -1), 30, 0)
-
-text("Others (without name)")
-
-se("sleepy","282574440", "106772613", "0", "0","0","0",0, 1, CFrame.new(0, 0, 0), CFrame.new (0, 0, 0), 0, 0)
-
-se("lay down","106772613", "181526230", "0", "0","0","0",0, 1, CFrame.new(0, 0, 0), CFrame.new (0, 0, 0), 0
-
--- New Custom Animation Addition
-text("Custom Troll Moves")
-
--- se2 makes you face the player, se does not.
--- Parameters: Name, Anim1, Anim2, Anim3, Anim4, Anim5, Anim6, Delay, Speed, OffsetA, OffsetB, LerpSpeed, ToggleInterval
+text("Hub 1.0 Exclusives")
 se2("Jump Spin Troll", "125750702", "125750702", "0", "0", "0", "0", 0.5, 2, CFrame.new(0, 5, 0), CFrame.new(0, 2, 0), 15, 0.3)
+
+-- Hub 1.0 Color Standard Enforcement
+local hubDark = Color3.fromRGB(25, 25, 25)
+frame1.BackgroundColor3 = hubDark
+frame2.BackgroundColor3 = hubDark
+imagebutton1.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
