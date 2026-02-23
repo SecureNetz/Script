@@ -1,6 +1,6 @@
 -- [[ Vs 1.0 : ]] --
 
--- Prevent Re-execution
+-- Prevent Re-execution 
 if _G.BattleForgeLoaded then
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "BattleForge Hub",
