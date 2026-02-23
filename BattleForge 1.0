@@ -1,4 +1,4 @@
--- [[ BATTLEFORGE EDITION V1.1: SINGLE EXECUTION MODE ]] --
+-- [[ Vs 1.0 : ]] --
 
 -- Prevent Re-execution
 if _G.BattleForgeLoaded then
