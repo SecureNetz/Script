@@ -1,0 +1,258 @@
+-- [[ BATTLEFORGE EDITION V1.1: SINGLE EXECUTION MODE ]] --
+
+-- Prevent Re-execution
+if _G.BattleForgeLoaded then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "BattleForge Hub",
+        Text = "Script is already running!",
+        Duration = 5
+    })
+    return 
+end
+_G.BattleForgeLoaded = true
+
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window = DrRayLibrary:Load("BattleForge Hub", "Default")
+
+-- BOOT SOUND ENGINE
+local bootSound = Instance.new("Sound")
+bootSound.SoundId = "rbxassetid://115995638665948"
+bootSound.Volume = 1
+bootSound.Parent = game:GetService("SoundService")
+bootSound:Play()
+game:GetService("Debris"):AddItem(bootSound, 5)
+
+-- Services
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+local RS = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local stampRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StampAsset")
+local deleteRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DeleteAsset")
+
+-- State Handling
+local spawnAmount = nil 
+local autoFlooding, freezeFlooding = false, false
+local swordFlooding, katanaFlooding = false, false
+local morphing = false
+local isHandlingTool = false 
+_G.FreezeRayActive = false
+_G.TrapBypassActive = false
+
+local character = lp.Character or lp.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-----------------------------------------------------------
+-- BACKGROUND LOGIC: VIP HUT BYPASS
+-----------------------------------------------------------
+local function setupHutBypass()
+    local hutNames = {"VIPHut", "MegaVIPHut", "UberVIPHut"}
+    local hutsFolder = workspace:FindFirstChild("Huts")
+    if not hutsFolder then return end
+    for _, name in ipairs(hutNames) do
+        local hut = hutsFolder:FindFirstChild(name)
+        if hut then
+            local door = hut:FindFirstChild("Exterior") and hut.Exterior:FindFirstChild("Door")
+            local interior = hut:FindFirstChild("Interior")
+            if door and interior then
+                door.Touched:Connect(function(hit)
+                    if hit.Parent == lp.Character and rootPart then
+                        rootPart.CFrame = interior:GetPivot() * CFrame.new(0, 3, 0)
+                    end
+                end)
+            end
+        end
+    end
+end
+task.spawn(setupHutBypass)
+
+-----------------------------------------------------------
+-- TAB 1: ASSETS & CREDITS
+-----------------------------------------------------------
+local assetTab = DrRayLibrary.newTab("Assets", "7733960981")
+assetTab.newLabel("Made By : Crxdlz, Ver 1.0")
+assetTab.newLabel("-------------------------------------------")
+
+assetTab.newInput("Spawn Amount", "Enter number to enable spawning", function(text)
+    local num = tonumber(text)
+    if num then spawnAmount = math.clamp(num, 1, 50) else spawnAmount = nil end
+end)
+
+-----------------------------------------------------------
+-- TAB 2: SAFETY
+-----------------------------------------------------------
+local safetyTab = DrRayLibrary.newTab("Safety", "10022240108")
+local safetyObjects = {}
+
+task.spawn(function()
+    while true do
+        if _G.TrapBypassActive and lp.Character then
+            local hum = lp.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = hum.MaxHealth end
+            for _, part in ipairs(lp.Character:GetChildren()) do
+                if part:IsA("BasePart") then part.CanTouch = false end
+            end
+        elseif not _G.TrapBypassActive and lp.Character then
+            for _, part in ipairs(lp.Character:GetChildren()) do
+                if part:IsA("BasePart") then part.CanTouch = true end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+safetyTab.newToggle("Trap Bypass", "God Mode vs Lasers/Spikes", false, function(state)
+    _G.TrapBypassActive = state
+    local targets = {"Laser1", "Laser2", "Laser3", "z#4fzo0", "Spikes"}
+    for _, objName in ipairs(targets) do
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v.Name == objName and v:IsA("BasePart") then
+                if state then
+                    if not safetyObjects[v] then safetyObjects[v] = {CanCollide = v.CanCollide} end
+                    if objName:find("Laser") then v.CanCollide = false v.Transparency = 0.5 end
+                else
+                    if safetyObjects[v] then v.CanCollide = safetyObjects[v].CanCollide v.Transparency = 0 end
+                end
+            end
+        end
+    end
+    if state and rootPart then rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 0.1, 0) end
+end)
+
+-----------------------------------------------------------
+-- TAB 3: FLOODING & PLAYGROUND
+-----------------------------------------------------------
+local floodTab = DrRayLibrary.newTab("Flooding", "10734950309")
+
+lp.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    task.spawn(setupHutBypass)
+end)
+
+local function forceDrop(tool)
+    if not tool:IsA("Tool") or isHandlingTool then return end
+    isHandlingTool = true 
+    tool.Parent = character
+    local timeout = 0
+    repeat 
+        local arm = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+        local grip = arm and arm:FindFirstChild("RightGrip")
+        if grip then grip:Destroy() break end
+        task.wait(0.05) 
+        timeout = timeout + 1
+    until timeout > 15 or tool.Parent ~= character
+    if tool:FindFirstChild("Handle") then
+        tool.Handle.CFrame = rootPart.CFrame * CFrame.new(math.random(-15, 15), -2, math.random(-15, 15))
+        tool.Handle.Velocity = Vector3.new(0, -20, 0)
+    end
+    tool.Parent = workspace
+    task.wait(0.1) 
+    isHandlingTool = false 
+end
+
+lp.Backpack.ChildAdded:Connect(function(child)
+    local name = child.Name:lower()
+    if (autoFlooding and name == "fusion coil") or
+       (freezeFlooding and (name == "super freeze ray" or name == "freezeray")) or
+       (swordFlooding and name:find("sword")) or
+       (katanaFlooding and (name:find("katana") or name:find("epic"))) then
+        task.spawn(forceDrop, child)
+    end
+end)
+
+local function spawnAsset(assetId)
+    if spawnAmount == nil then return end 
+    local targetPlate = nil
+    local plates = workspace:FindFirstChild("Plates")
+    if plates then
+        for _, folder in pairs(plates:GetChildren()) do
+            local p = folder:FindFirstChild("Plate")
+            if p and (rootPart.Position - p.Position).Magnitude < 80 then targetPlate = p break end
+        end
+    end
+    if not targetPlate then return end
+    local spawnedModels = {}
+    local rot = CFrame.new(0, 0, 0, 0.00017786026, -1, -0.0000811219, -0.00017789006, 0.0000810623, -1, 0.99999994, 0.00017789006, -0.00017786026)
+    for i = 1, spawnAmount do
+        local row = math.floor((i - 1) / 6); local col = (i - 1) % 6
+        local model = stampRemote:InvokeServer(assetId, targetPlate.CFrame * CFrame.new((col * 8) - 20, 10.5, (row * 8) - 20) * rot, "{36e9d98d-9757-4da1-ba5d-b9bbeb0097ba}", {}, 0)
+        if model then table.insert(spawnedModels, model) end
+    end
+    task.delay(15, function() for _, m in ipairs(spawnedModels) do if m then deleteRemote:InvokeServer(m) end end end)
+end
+
+local assets = {{"Toilet", 56449594}, {"Bed", 56449778}, {"Fridge", 65894286}, {"Door", 56446583}, {"Chairs", 56446320}, {"Firepit", 41324902}, {"House", 56447853}, {"Spikes", 41324903}, {"Elevator", 41324881}}
+for _, data in ipairs(assets) do assetTab.newButton("Spawn "..data[1], "Requires Spawn Amount", function() spawnAsset(data[2]) end) end
+
+local function runGiverLoop(flag, toolName)
+    while _G[flag] do
+        if not isHandlingTool then
+            local givers = workspace:FindFirstChild("Interactables") and workspace.Interactables.Givers
+            local button = givers and givers:FindFirstChild(toolName) and givers[toolName]:FindFirstChild("Button")
+            if rootPart and button then firetouchinterest(rootPart, button, 0) firetouchinterest(rootPart, button, 1) end
+        end
+        task.wait(0.2)
+    end
+end
+
+floodTab.newToggle("Auto Flood", "Fusion Coil Flood", false, function(state) autoFlooding = state _G.autoLoop = state if state then task.spawn(runGiverLoop, "autoLoop", "Fusion Coil") end end)
+floodTab.newToggle("Freeze Flood", "Freeze Ray Flood", false, function(state) freezeFlooding = state _G.freezeLoop = state if state then task.spawn(runGiverLoop, "freezeLoop", "Super Freeze Ray") end end)
+floodTab.newToggle("Sword Flood", "VIP Sword Flood", false, function(state) swordFlooding = state _G.swordLoop = state if state then task.spawn(runGiverLoop, "swordLoop", "VIP Sword") end end)
+floodTab.newToggle("Katana Flood", "Epic Katana Flood", false, function(state) katanaFlooding = state _G.katanaLoop = state if state then task.spawn(runGiverLoop, "katanaLoop", "Epic Katana") end end)
+
+floodTab.newLabel("--- Playground Extras ---")
+floodTab.newToggle("Morph Flood", "Standard 1.1 Morph Cycle", false, function(state)
+    morphing = state
+    if state then
+        task.spawn(function()
+            while morphing do
+                local morphs = workspace:FindFirstChild("Interactables") and workspace.Interactables:FindFirstChild("Morphs")
+                if morphs and rootPart then
+                    rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 0.1, 0)
+                    for _, v in ipairs(morphs:GetChildren()) do
+                        local p = v:FindFirstChild("Button") or v:FindFirstChild("Pad") or v:FindFirstChildWhichIsA("BasePart")
+                        if p then firetouchinterest(rootPart, p, 0) task.wait(0.01) firetouchinterest(rootPart, p, 1) end
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
+local function runSupernova()
+    local currentRotation = 0
+    task.spawn(function()
+        while _G.FreezeRayActive do
+            local char = lp.Character
+            local tool = char and (char:FindFirstChild("Super Freeze Ray") or char:FindFirstChild("FreezeRay")) or lp.Backpack:FindFirstChild("Super Freeze Ray")
+            if tool and _G.FreezeRayActive then
+                if tool.Parent == lp.Backpack then char.Humanoid:EquipTool(tool) end
+                local remote = tool:FindFirstChild("FireEvent")
+                if rootPart and remote then
+                    rootPart.CFrame = rootPart.CFrame * CFrame.new(0, 0.05, 0)
+                    currentRotation = (currentRotation + 30) % 360
+                    for i = 1, 60 do 
+                        if not _G.FreezeRayActive then break end 
+                        local angle = currentRotation + (i * 6)
+                        local target = rootPart.Position + Vector3.new(math.cos(math.rad(angle)) * 150, 0, math.sin(math.rad(angle)) * 150)
+                        remote:FireServer(target)
+                    end
+                end
+            end
+            task.wait(0.05) 
+        end
+    end)
+end
+
+floodTab.newToggle("Freeze Supernova MAX", "Burst Fire Spiral", false, function(state)
+    _G.FreezeRayActive = state
+    if state then
+        pcall(function()
+            local giver = workspace.Interactables.Givers:FindFirstChild("Super Freeze Ray")
+            if giver and giver.Button then firetouchinterest(rootPart, giver.Button, 0) task.wait(0.05) firetouchinterest(rootPart, giver.Button, 1) end
+        end)
+        runSupernova()
+    end
+end)
