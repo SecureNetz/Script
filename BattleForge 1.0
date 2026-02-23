@@ -16,7 +16,7 @@ local window = DrRayLibrary:Load("BattleForge Hub", "Default")
 
 -- BOOT SOUND ENGINE
 local bootSound = Instance.new("Sound")
-bootSound.SoundId = "rbxassetid://115995638665948"
+bootSound.SoundId = "rbxassetid://125090389445721"
 bootSound.Volume = 1
 bootSound.Parent = game:GetService("SoundService")
 bootSound:Play()
@@ -71,7 +71,7 @@ task.spawn(setupHutBypass)
 -----------------------------------------------------------
 local assetTab = DrRayLibrary.newTab("Assets", "7733960981")
 assetTab.newLabel("Made By : Crxdlz, Ver 1.0")
-assetTab.newLabel("-------------------------------------------")
+assetTab.newLabel("---------------------------------")
 
 assetTab.newInput("Spawn Amount", "Enter number to enable spawning", function(text)
     local num = tonumber(text)
